@@ -1,0 +1,16 @@
+*.env
+*.db
+__pycache__/
+*.pyc
+*.pyo
+.Python
+.env.*
+.venv/
+venv/
+.env.local
+.env.production
+*.log
+.DS_Store
+node_modules/
+browser_data/
+playwright/.cache/
