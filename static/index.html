@@ -5034,7 +5034,9 @@ function attrEsc(s){
 }
 function safeHTML(html){
   if(html===null||html===undefined) return '';
-  return String(html).replace(/<script[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi,'');
+  // 将 script 结束标签拆分为字符串拼接，避免 HTML 解析器误判
+  var scriptRe = new RegExp('<script[^>]*>[\\s\\S]*?</scr' + 'ipt>', 'gi');
+  return String(html).replace(scriptRe,'').replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi,'');
 }
 function intentBadge(i){
   if(i==='high') return '<span class="badge badge-high">高意向</span>';
