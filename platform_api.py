@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
 from database import (
-    get_db, PlatformAccount, PlatformTask, PlatformTaskStatus,
+    get_db, SessionLocal, PlatformAccount, PlatformTask, PlatformTaskStatus,
     ContentLibrary, TaskType, EngagementRecord, User, Lead,
     KnowledgeBase, TopicLibrary, AuditLog, CommentInbox,
     AccountGroup, AccountGroupMember, ContentPerformance, TeamInvitation,

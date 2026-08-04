@@ -9,7 +9,7 @@ class TestConfig:
         from config import settings
         assert settings.APP_HOST in ("0.0.0.0", "127.0.0.1", "localhost")
         assert 1024 < settings.APP_PORT < 65535
-        assert settings.APP_VERSION.startswith("2.")
+        assert settings.APP_VERSION.startswith("1.")
 
     def test_jwt_secret_available(self):
         """在 .env 存在的前提下，JWT_SECRET 非空"""

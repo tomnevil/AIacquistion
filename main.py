@@ -88,7 +88,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     """全局异常处理 — 服务端记录完整日志，客户端仅返回通用错误"""
     error_id = uuid.uuid4().hex[:8]
     tb = traceback.format_exc()
-    logging.error(
+    app_logger.error(
         "[%s] %s %s — %s: %s\n%s",
         error_id, request.method, request.url.path,
         type(exc).__name__, str(exc), tb,

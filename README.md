@@ -184,4 +184,4 @@ pytest tests/ -m unit -v
 
 ## 版本
 
-v2.1.0 — 引入 Alembic、结构化日志、Base mixin、统一平台注册、团队权限、pytest 测试
+v1.1 — 引入 Alembic、结构化日志、Base mixin、统一平台注册、团队权限、pytest 测试
