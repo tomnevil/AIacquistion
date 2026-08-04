@@ -105,7 +105,7 @@ class Lead(Base):
     __tablename__ = "leads"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, nullable=True, index=True)  # 所属用户
+    user_id = Column(Integer, nullable=True, index=True)
     name = Column(String(100), nullable=False)
     company = Column(String(200), default="")
     email = Column(String(200), default="")
@@ -116,19 +116,28 @@ class Lead(Base):
     status = Column(String(50), default=LeadStatus.NEW.value)
 
     # AI 分析结果
-    ai_score = Column(Float, default=0.0)           # 0-100 意向评分
-    ai_intent = Column(String(50), default="")      # 意向等级: high/medium/low
-    ai_tags = Column(Text, default="")              # 标签(逗号分隔)
-    ai_summary = Column(Text, default="")           # AI 分析摘要
+    ai_score = Column(Float, default=0.0)
+    ai_intent = Column(String(50), default="")
+    ai_tags = Column(Text, default="")
+    ai_summary = Column(Text, default="")
 
     # 交互记录
     contact_count = Column(Integer, default=0)
     last_contact_at = Column(DateTime, nullable=True)
 
     # SLA 跟进
-    sla_hours = Column(Integer, default=48)          # SLA时限(小时)
-    sla_deadline = Column(DateTime, nullable=True)   # 下次跟进截止时间
-    assigned_to = Column(String(100), default="")    # 负责销售
+    sla_hours = Column(Integer, default=48)
+    sla_deadline = Column(DateTime, nullable=True)
+    assigned_to = Column(String(100), default="")
+
+    # 新增: 线索旅程扩展
+    journey_stage = Column(String(50), default="new")  # new → contacted → qualified → quoted → converted/lost
+    last_reply_content = Column(Text, default="")       # 客户最后一次回复内容
+    conversion_value = Column(Float, default=0.0)      # 成交金额
+    conversion_date = Column(DateTime, nullable=True)
+    loss_reason = Column(String(200), default="")       # 流失原因
+    attribution_task_id = Column(Integer, nullable=True)  # 归因来源的平台任务
+    attribution_content_id = Column(Integer, nullable=True)  # 归因来源的内容
 
     # 自定义字段 (JSON)
     extra_data = Column(Text, default="{}")
@@ -305,7 +314,7 @@ class KnowledgeBase(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class TopicLibrary(Base):
-    """选题库 — AI生成 + 人工管理"""
+    """选题库 — AI生成 + 人工管理 + 热点自动选题"""
     __tablename__ = "topic_library"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -313,12 +322,24 @@ class TopicLibrary(Base):
     title = Column(String(300), nullable=False)
     platform = Column(String(30), default="通用")
     category = Column(String(50), default="通用")
-    description = Column(Text, default="")              # 选题描述/背景
-    status = Column(String(20), default="draft")        # draft / selected / published / archived
+    description = Column(Text, default="")
+    status = Column(String(20), default="draft")
     is_ai_generated = Column(Boolean, default=False)
-    priority = Column(Integer, default=0)               # 优先级 0-10
+    priority = Column(Integer, default=0)
     tags = Column(Text, default="")
-    published_content = Column(Text, default="")        # 发布后的内容链接
+    published_content = Column(Text, default="")
+
+    # 新增: 热点选题扩展
+    source = Column(String(50), default="manual")      # manual / hot_search / ai_issue / calendar
+    source_platform = Column(String(30), default="")   # 来源平台 weibo/zhihu/douyin/bilibili
+    hot_score = Column(Float, default=0.0)             # 热度评分 0-100
+    trend_score = Column(Float, default=0.0)          # 趋势分数（增长斜率）
+    relevance_score = Column(Float, default=0.0)        # 与产品/行业相关度
+    potential_score = Column(Float, default=0.0)       # 获客潜力分
+    heat_decay = Column(Float, default=1.0)            # 热度衰减系数
+    hot_url = Column(Text, default="")                 # 原始热点链接
+    raw_data = Column(Text, default="{}")              # 原始热点数据 JSON
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -402,27 +423,6 @@ class AccountGroupMember(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
-class ContentPerformance(Base):
-    """内容效果统计"""
-    __tablename__ = "content_performance"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, nullable=True, index=True)
-    account_id = Column(Integer, nullable=False)
-    platform = Column(String(30), nullable=False)
-    task_id = Column(Integer, nullable=True)
-    content_url = Column(Text, default="")
-    title = Column(String(500), default="")
-    views = Column(Integer, default=0)
-    likes = Column(Integer, default=0)
-    comments = Column(Integer, default=0)
-    shares = Column(Integer, default=0)
-    bookmarks = Column(Integer, default=0)
-    leads_generated = Column(Integer, default=0)
-    published_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-
-
 class TeamInvitation(Base):
     """团队邀请"""
     __tablename__ = "team_invitations"
@@ -464,6 +464,232 @@ class RiskContentHash(Base):
     content_hash = Column(String(32), nullable=False, index=True)
     account_id = Column(Integer, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ════════════════════════════════════════════════════════════════
+# PRD 第二期扩展模型: 热点引擎/私域闭环/内容优化/竞品监控
+# ════════════════════════════════════════════════════════════════
+
+class HotTopic(Base):
+    """热点话题表 — 热榜抓取的原始热点数据"""
+    __tablename__ = "hot_topics"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True, index=True)
+    source_platform = Column(String(30), nullable=False, index=True)  # weibo/zhihu/douyin/bilibili
+    title = Column(String(500), nullable=False)
+    url = Column(Text, default="")
+    category = Column(String(50), default="")
+    rank_position = Column(Integer, default=0)       # 热榜排名
+    heat_value = Column(Float, default=0.0)          # 原始热度值
+    trend = Column(String(20), default="flat")       # rising / flat / falling
+    trend_speed = Column(Float, default=0.0)         # 增长速度
+
+    # 综合评分
+    hot_score = Column(Float, default=0.0)
+    relevance_score = Column(Float, default=0.0)
+    potential_score = Column(Float, default=0.0)
+    final_score = Column(Float, default=0.0)
+
+    # 状态
+    status = Column(String(20), default="new")       # new / scored / converted_to_topic / ignored
+    converted_topic_id = Column(Integer, nullable=True)
+    raw_data = Column(Text, default="{}")            # 原始抓取数据
+
+    # 时效
+    first_seen_at = Column(DateTime, default=datetime.utcnow)
+    last_updated_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=True)     # 热度衰减截止时间
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class LeadFollowUp(Base):
+    """线索跟进计划表 — 第1/3/7天跟进节奏"""
+    __tablename__ = "lead_follow_ups"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True, index=True)
+    lead_id = Column(Integer, nullable=False, index=True)
+    sequence_day = Column(Integer, default=1)         # 第几天：1/3/7
+    planned_at = Column(DateTime, default=datetime.utcnow)
+    executed_at = Column(DateTime, nullable=True)
+    status = Column(String(20), default="pending")   # pending / sent / skipped / failed
+
+    # AI 生成的跟进内容
+    strategy = Column(String(200), default="")        # 跟进策略：新钩子/发案例/报价邀请
+    ai_content = Column(Text, default="")
+    actual_content = Column(Text, default="")
+    channel = Column(String(50), default="email")     # email / 企业微信 / 评论
+
+    # 跟进结果
+    response_received = Column(Boolean, default=False)
+    response_summary = Column(Text, default="")
+    next_action = Column(String(100), default="")     # 下一步动作建议
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ContentVariant(Base):
+    """内容变体表 — A/B 测试多版本内容"""
+    __tablename__ = "content_variants"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True, index=True)
+    source_task_id = Column(Integer, nullable=True)
+    source_content_id = Column(Integer, nullable=True)
+    source_topic_id = Column(Integer, nullable=True)
+
+    platform = Column(String(30), nullable=False)
+    variant_index = Column(Integer, default=0)       # 第几个变体
+    title = Column(String(500), default="")
+    content = Column(Text, default="")
+    hashtags = Column(Text, default="")               # JSON 数组
+
+    # A/B 测试结果
+    is_winner = Column(Boolean, default=False)
+    published_at = Column(DateTime, nullable=True)
+    performance_views = Column(Integer, default=0)
+    performance_likes = Column(Integer, default=0)
+    performance_comments = Column(Integer, default=0)
+    performance_score = Column(Float, default=0.0)   # 综合表现分
+
+    # 跨平台再创作
+    cross_platform_from = Column(String(30), default="")  # 原始来源平台
+    is_republished = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class CompetitorAccount(Base):
+    """竞品账号监控"""
+    __tablename__ = "competitor_accounts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True, index=True)
+    platform = Column(String(30), nullable=False)
+    account_name = Column(String(200), default="")
+    account_url = Column(Text, default="")
+    industry = Column(String(100), default="")
+    notes = Column(Text, default="")
+
+    # 监控数据
+    follower_count = Column(Integer, default=0)
+    content_count = Column(Integer, default=0)
+    avg_engagement = Column(Float, default=0.0)       # 平均互动率
+    last_monitored_at = Column(DateTime, nullable=True)
+
+    status = Column(String(20), default="active")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class CompetitorContent(Base):
+    """竞品内容库 — 用于内容差距分析"""
+    __tablename__ = "competitor_contents"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    competitor_id = Column(Integer, nullable=False, index=True)
+    platform = Column(String(30), default="")
+    title = Column(String(500), default="")
+    content_summary = Column(Text, default="")
+    content_url = Column(Text, default="")
+    tags = Column(Text, default="")
+    published_at = Column(DateTime, nullable=True)
+
+    # 表现指标
+    views = Column(Integer, default=0)
+    likes = Column(Integer, default=0)
+    comments = Column(Integer, default=0)
+    shares = Column(Integer, default=0)
+    engagement_rate = Column(Float, default=0.0)
+
+    # 差距分析
+    gap_analysis = Column(Text, default="")            # 与我方内容的差距分析
+    opportunity_score = Column(Float, default=0.0)    # 借势潜力分 0-100
+
+    fetched_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class WeeklyReport(Base):
+    """周报存储 — 自动生成的获客周报"""
+    __tablename__ = "weekly_reports"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True, index=True)
+    team_id = Column(Integer, nullable=True)
+    period_start = Column(DateTime, nullable=False)
+    period_end = Column(DateTime, nullable=False)
+
+    # 报告内容
+    executive_summary = Column(Text, default="")
+    key_metrics = Column(Text, default="{}")          # JSON: {total_leads, conversion_rate, ...}
+    hot_opportunities = Column(Text, default="[]")    # JSON: 热点机会列表
+    competitor_highlights = Column(Text, default="[]")  # JSON: 竞品动态
+    recommendations = Column(Text, default="[]")       # JSON: 行动建议
+
+    # 发送状态
+    sent_to = Column(Text, default="")                # 已发送的渠道
+    sent_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ChannelROI(Base):
+    """渠道 ROI 分析表"""
+    __tablename__ = "channel_roi"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True, index=True)
+    channel = Column(String(50), nullable=False)      # weibo / zhihu / email / wechat
+    period_start = Column(DateTime, nullable=False)
+    period_end = Column(DateTime, nullable=False)
+
+    # 投入
+    cost = Column(Float, default=0.0)
+
+    # 产出
+    leads_generated = Column(Integer, default=0)
+    qualified_leads = Column(Integer, default=0)
+    converted_leads = Column(Integer, default=0)
+    total_value = Column(Float, default=0.0)
+
+    # 计算指标
+    roi = Column(Float, default=0.0)                  # 投资回报率
+    avg_lead_score = Column(Float, default=0.0)      # 平均线索质量
+    conversion_rate = Column(Float, default=0.0)
+
+    # 归因
+    top_content_id = Column(Integer, nullable=True)
+    top_task_id = Column(Integer, nullable=True)
+    notes = Column(Text, default="")
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ContentPerformance(Base):
+    """内容效果统计"""
+    __tablename__ = "content_performance"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True, index=True)
+    account_id = Column(Integer, nullable=False)
+    platform = Column(String(30), nullable=False)
+    task_id = Column(Integer, nullable=True)
+    content_url = Column(Text, default="")
+    title = Column(String(500), default="")
+    views = Column(Integer, default=0)
+    likes = Column(Integer, default=0)
+    comments = Column(Integer, default=0)
+    shares = Column(Integer, default=0)
+    bookmarks = Column(Integer, default=0)
+    leads_generated = Column(Integer, default=0)
+
+    # 新增: 表现分析
+    engagement_rate = Column(Float, default=0.0)
+    is_viral = Column(Boolean, default=False)         # 是否爆款
+    viral_score = Column(Float, default=0.0)          # 爆款分
+    variant_id = Column(Integer, nullable=True)
+    is_winner = Column(Boolean, default=False)       # A/B 测试胜出
+    tags = Column(Text, default="")
+    published_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 def init_db():
@@ -596,6 +822,39 @@ def init_db():
             ("team_invitations", "invite_code", "VARCHAR(20)"),
             ("team_invitations", "max_uses", "INTEGER DEFAULT 1"),
             ("team_invitations", "use_count", "INTEGER DEFAULT 0"),
+        ]:
+            try:
+                _ensure_column(db, table, col, dtype)
+            except Exception:
+                db.rollback()
+
+        # ── PRD 第二期扩展：线索旅程 / 热点选题 / 内容效果 ──
+        for table, col, dtype in [
+            # Lead 扩展
+            ("leads", "journey_stage", "VARCHAR(50) DEFAULT 'new'"),
+            ("leads", "last_reply_content", "TEXT DEFAULT ''"),
+            ("leads", "conversion_value", "FLOAT DEFAULT 0"),
+            ("leads", "conversion_date", "DATETIME"),
+            ("leads", "loss_reason", "VARCHAR(200) DEFAULT ''"),
+            ("leads", "attribution_task_id", "INTEGER"),
+            ("leads", "attribution_content_id", "INTEGER"),
+            # TopicLibrary 扩展
+            ("topic_library", "source", "VARCHAR(50) DEFAULT 'manual'"),
+            ("topic_library", "source_platform", "VARCHAR(30) DEFAULT ''"),
+            ("topic_library", "hot_score", "FLOAT DEFAULT 0"),
+            ("topic_library", "trend_score", "FLOAT DEFAULT 0"),
+            ("topic_library", "relevance_score", "FLOAT DEFAULT 0"),
+            ("topic_library", "potential_score", "FLOAT DEFAULT 0"),
+            ("topic_library", "heat_decay", "FLOAT DEFAULT 1"),
+            ("topic_library", "hot_url", "TEXT DEFAULT ''"),
+            ("topic_library", "raw_data", "TEXT DEFAULT '{}'"),
+            # ContentPerformance 扩展
+            ("content_performance", "engagement_rate", "FLOAT DEFAULT 0"),
+            ("content_performance", "is_viral", "BOOLEAN DEFAULT 0"),
+            ("content_performance", "viral_score", "FLOAT DEFAULT 0"),
+            ("content_performance", "variant_id", "INTEGER"),
+            ("content_performance", "is_winner", "BOOLEAN DEFAULT 0"),
+            ("content_performance", "tags", "TEXT DEFAULT ''"),
         ]:
             try:
                 _ensure_column(db, table, col, dtype)

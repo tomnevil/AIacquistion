@@ -28,6 +28,10 @@ from database import init_db
 from api import router as api_router
 from platform_api import router as platform_router
 from auth_api import router as auth_router
+from hot_topic_api import router as hot_topic_router
+from follow_up_api import router as follow_up_router
+from optimization_api import router as optimization_router
+from competitor_api import router as competitor_router
 from config import settings
 
 
@@ -82,6 +86,10 @@ app = FastAPI(
 app.include_router(auth_router)
 app.include_router(api_router)
 app.include_router(platform_router)
+app.include_router(hot_topic_router)
+app.include_router(follow_up_router)
+app.include_router(optimization_router)
+app.include_router(competitor_router)
 
 
 @app.exception_handler(Exception)

@@ -26,7 +26,7 @@ class Settings:
     # ── 应用 ──
     APP_HOST: str = os.getenv("APP_HOST", "0.0.0.0")
     APP_PORT: int = int(os.getenv("APP_PORT", "8000"))
-    APP_VERSION: str = os.getenv("APP_VERSION", "1.1")
+    APP_VERSION: str = os.getenv("APP_VERSION", "1.2")
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
     STATIC_DIR: str = os.getenv("STATIC_DIR", "static")

@@ -15,6 +15,10 @@ AI 驱动的智能社媒获客平台，帮助增长/运营团队在微博、小�
 | 🛡 **内容审核** | 多级审核工作流 + 风控分级 |
 | 👥 **团队协作** | 团队/成员/权限体系（admin / editor / viewer） |
 | 📊 **数据看板** | 实时统计客户总量、意向分布、转化漏斗 |
+| 🔥 **热点选题引擎** | 多平台热榜自动抓取、热度评分、自动生成选题、热点衰减 |
+| 🎯 **私域承接闭环** | 线索旅程状态机（触达→合格→报价→成交→流失）、1/3/7 天跟进节奏、转化归因 |
+| 📈 **内容优化引擎** | 爆款拆解分析、A/B 测试变体、跨平台再创作、SEO 关键词建议 |
+| 🔍 **竞争情报** | 竞品账号监控、内容差距分析、AI 周报、渠道 ROI 对比 |
 
 ## 技术栈
 
@@ -36,6 +40,10 @@ AI-Acquisition/
 ├── api.py                   # 核心 REST API（客户/线索/邮件）
 ├── platform_api.py          # 多平台运营 API（账号/任务/审核/素材/知识库等）
 ├── auth_api.py              # 认证/注册/权限 API
+├── hot_topic_api.py         # 🔥 热点选题引擎 API
+├── follow_up_api.py         # 🎯 私域承接与转化 API
+├── optimization_api.py      # 📈 内容优化引擎 API
+├── competitor_api.py        # 🔍 竞争情报 API
 ├── platforms/               # 平台适配器（每个平台一个文件）
 │   ├── __init__.py          # 统一注册表 + 工厂 get_platform()
 │   ├── base.py              # BaseSocialPlatform 抽象基类
@@ -57,7 +65,11 @@ AI-Acquisition/
 │   ├── risk_control.py      # 账号风控分级
 │   ├── scheduler.py        # APScheduler 定时发布
 │   ├── content_strategy.py # 选题策略
-│   └── email_service.py     # 邮件外联
+│   ├── email_service.py     # 邮件外联
+│   ├── hot_topic_service.py # 🔥 热点选题引擎
+│   ├── follow_up_service.py # 🎯 线索旅程与跟进引擎
+│   ├── content_optimization.py # 📈 内容优化引擎
+│   └── competitor_service.py # 🔍 竞争情报引擎
 ├── utils/
 │   ├── permission.py        # 权限控制（RBAC）
 │   └── logger.py            # 统一日志配置
@@ -68,6 +80,18 @@ AI-Acquisition/
 ├── requirements.txt
 └── .env.example
 ```
+
+## API 路由总览
+
+| 前缀 | 模块 | 说明 |
+|------|------|------|
+| `/api/auth/*` | 认证 | 登录/注册/权限 |
+| `/api/*` | 核心 | 客户/线索/邮件 |
+| `/api/platforms/*` | 多平台获客 | 账号/任务/审核/素材/知识库 |
+| `/api/hot-topics/*` | 热点选题引擎 | 热榜抓取/评分/自动选题 |
+| `/api/follow-ups/*` | 私域承接 | 线索旅程/跟进节奏/转化归因 |
+| `/api/optimization/*` | 内容优化 | 爆款拆解/A/B测试/再创作/SEO |
+| `/api/competitor/*` | 竞争情报 | 竞品监控/差距分析/周报/ROI |
 
 ## 快速开始
 
@@ -184,4 +208,4 @@ pytest tests/ -m unit -v
 
 ## 版本
 
-v1.1 — 引入 Alembic、结构化日志、Base mixin、统一平台注册、团队权限、pytest 测试
+v1.2 — 引入热点选题引擎、私域承接闭环、内容优化引擎、竞争情报模块（PRD 四引擎升级）

@@ -100,7 +100,8 @@ async def get_optional_user(
 # ════════════════════════════════════════
 
 def has_permission(user: User, permission: str) -> bool:
-    """检查用户是否具有某项权限"""
+    """检查用户是否具有某项权限或更高角色"""
+    from config import settings
     perm_map = {
         "admin":   ["manage_system", "manage_users", "manage_team", "approve_content", "edit_content", "view_data", "export_data"],
         "manager": ["manage_team", "approve_content", "edit_content", "view_data", "export_data"],
@@ -108,7 +109,16 @@ def has_permission(user: User, permission: str) -> bool:
         "viewer":  ["view_data"],
     }
     allowed = perm_map.get(user.role, ["view_data"])
-    return permission in allowed
+    # 先检查具体权限名
+    if permission in allowed:
+        return True
+    # 如果 permission 是角色名，则用层级检查（admin > manager > editor > viewer）
+    role_hierarchy = settings.ROLE_HIERARCHY
+    if permission in role_hierarchy:
+        user_level = role_hierarchy.get(user.role, 0)
+        required_level = role_hierarchy.get(permission, 0)
+        return user_level >= required_level
+    return False
 
 
 def require_permission(permission: str):
