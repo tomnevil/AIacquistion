@@ -110,8 +110,20 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/")
 def index():
-    """前端页面"""
-    return FileResponse(f"{settings.STATIC_DIR}/index.html")
+    """前端页面 — 禁用缓存确保用户总是获取最新版"""
+    from fastapi.responses import HTMLResponse
+    import os
+    html_path = f"{settings.STATIC_DIR}/index.html"
+    with open(html_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    return HTMLResponse(
+        content=content,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 if __name__ == "__main__":
