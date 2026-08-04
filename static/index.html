@@ -993,6 +993,325 @@ a:hover { text-decoration:underline; }
 .pwd-row { display:flex; gap:12px; align-items:flex-end; }
 .pwd-row .form-group { flex:1; }
 
+/* ── 全局美化 v1.1 ── */
+
+/* 页面头部横幅 */
+.section-header { display:flex; align-items:center; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
+.section-header h2 { font-size:20px; font-weight:700; color:var(--text); letter-spacing:-0.3px; }
+.section-header .badge-count { background:var(--purple-gradient); color:#fff; font-size:11px; padding:2px 10px; border-radius:12px; font-weight:600; }
+.section-header .sub-desc { font-size:13px; color:var(--text2); margin-left:4px; }
+
+/* 欢迎横幅 */
+.greeting-banner {
+  background: linear-gradient(135deg, rgba(99,102,241,0.04) 0%, rgba(139,92,246,0.06) 50%, rgba(124,58,237,0.03) 100%);
+  border:1px solid rgba(99,102,241,0.12);
+  border-radius:var(--radius);
+  padding:20px 24px;
+  margin-bottom:20px;
+  display:flex;
+  align-items:center;
+  gap:20px;
+  backdrop-filter: blur(12px);
+  position:relative;
+  overflow:hidden;
+}
+.greeting-banner::after {
+  content:''; position:absolute; right:-20px; top:-20px; width:120px; height:120px;
+  border-radius:50%;
+  background:var(--purple-gradient); opacity:0.06; pointer-events:none;
+}
+.greeting-banner .gb-icon {
+  width:56px; height:56px; border-radius:var(--radius); background:var(--purple-gradient);
+  display:flex; align-items:center; justify-content:center; font-size:28px;
+  box-shadow:0 8px 24px rgba(99,102,241,0.25); flex-shrink:0;
+}
+.greeting-banner .gb-text h3 { font-size:18px; font-weight:700; color:var(--text); margin:0 0 4px; }
+.greeting-banner .gb-text p { font-size:13px; color:var(--text2); margin:0; }
+.greeting-banner .gb-actions { margin-left:auto; display:flex; gap:10px; flex-shrink:0; }
+
+/* 统计趋势指示器 */
+.stat-trend { font-size:11px; font-weight:600; display:inline-flex; align-items:center; gap:2px; margin-left:8px; }
+.stat-trend.up { color:#059669; }
+.stat-trend.down { color:#DC2626; }
+.stat-trend.flat { color:#64748B; }
+
+/* 高级 KPI 卡片 */
+.kpi-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:14px; margin-bottom:20px; }
+.kpi-card {
+  background:rgba(255,255,255,0.95);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  border-radius:var(--radius);
+  padding:18px 20px;
+  border:1px solid rgba(148,163,184,0.12);
+  box-shadow:var(--shadow);
+  transition:all .3s;
+  position:relative;
+  overflow:hidden;
+  cursor:pointer;
+}
+.kpi-card:hover { transform:translateY(-3px); box-shadow:var(--shadow-lg); border-color:rgba(99,102,241,0.2); }
+.kpi-card .kpi-icon { font-size:24px; margin-bottom:8px; display:block; }
+.kpi-card .kpi-value { font-size:28px; font-weight:700; color:var(--text); }
+.kpi-card .kpi-label { font-size:12px; color:var(--text2); margin-top:2px; }
+.kpi-card .kpi-change { font-size:11px; font-weight:600; margin-top:4px; }
+.kpi-card .kpi-change.up { color:#059669; } .kpi-card .kpi-change.down { color:#DC2626; }
+.kpi-card::after { content:''; position:absolute; right:0; top:0; width:60px; height:60px; border-radius:0 0 0 60px; opacity:0.04; transition:all .3s; }
+.kpi-card:nth-child(1)::after { background:var(--purple-gradient); }
+.kpi-card:nth-child(2)::after { background:#10B981; }
+.kpi-card:nth-child(3)::after { background:#F59E0B; }
+.kpi-card:nth-child(4)::after { background:#06B6D4; }
+.kpi-card:hover::after { width:90px; height:90px; }
+
+/* 热点话题横条 */
+.hot-topic-bar { 
+  background:linear-gradient(135deg, rgba(249,115,22,0.05), rgba(245,158,11,0.08));
+  border:1px solid rgba(249,115,22,0.15);
+  border-radius:var(--radius);
+  padding:14px 18px;
+  margin-bottom:18px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+  backdrop-filter:blur(8px);
+}
+.hot-topic-bar .ht-label {
+  font-size:13px; font-weight:700; white-space:nowrap;
+  color:#EA580C; display:flex; align-items:center; gap:6px;
+}
+.hot-topic-bar .ht-chips { display:flex; gap:8px; flex-wrap:wrap; flex:1; }
+.hot-topic-chip {
+  background:#fff; border:1px solid rgba(249,115,22,0.2);
+  padding:5px 14px; border-radius:20px; font-size:12px; font-weight:500;
+  color:#9A3412; cursor:pointer; transition:all .2s;
+  white-space:nowrap; display:inline-flex; align-items:center; gap:5px;
+}
+.hot-topic-chip:hover { 
+  background:linear-gradient(135deg, #F97316, #EA580C); color:#fff;
+  border-color:transparent; transform:translateY(-1px);
+  box-shadow:0 4px 12px rgba(249,115,22,0.25);
+}
+.hot-topic-chip .ht-score { font-size:10px; opacity:0.7; }
+.hot-topic-bar .ht-more { font-size:12px; color:#EA580C; cursor:pointer; white-space:nowrap; font-weight:600; }
+
+/* 发布页高级选项面板 */
+.publish-advanced {
+  background:rgba(255,255,255,0.7);
+  border:1px dashed rgba(148,163,184,0.25);
+  border-radius:var(--radius-sm);
+  padding:16px;
+  margin-top:14px;
+  transition:all .3s;
+}
+.publish-advanced:hover { border-color:rgba(99,102,241,0.3); background:rgba(255,255,255,0.9); }
+.publish-advanced .pa-header {
+  display:flex; align-items:center; gap:8px; margin-bottom:12px;
+  font-size:13px; font-weight:600; color:var(--text);
+  cursor:pointer; user-select:none;
+}
+.publish-advanced .pa-header .pa-arrow { transition:transform .2s; font-size:10px; }
+.publish-advanced .pa-body { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; }
+.publish-advanced .pa-field label { font-size:11px; color:var(--text2); display:block; margin-bottom:4px; text-transform:uppercase; letter-spacing:.3px; font-weight:600; }
+.publish-advanced .pa-field select,
+.publish-advanced .pa-field input {
+  width:100%; padding:8px 12px; border:1.5px solid rgba(148,163,184,0.3);
+  border-radius:var(--radius-sm); font-size:13px; background:#fff;
+  transition:all .3s;
+}
+.publish-advanced .pa-field select:focus,
+.publish-advanced .pa-field input:focus { border-color:var(--primary); box-shadow:0 0 0 3px rgba(99,102,241,0.1); outline:none; }
+.publish-advanced .pa-field select:hover,
+.publish-advanced .pa-field input:hover { border-color:rgba(99,102,241,0.3); }
+
+/* 内容类型选择器 */
+.content-type-group { display:flex; gap:6px; margin-top:8px; }
+.content-type-btn {
+  padding:8px 16px; border:1.5px solid rgba(148,163,184,0.25);
+  border-radius:20px; font-size:12px; font-weight:600; cursor:pointer;
+  background:#fff; color:var(--text2); transition:all .2s;
+  display:flex; align-items:center; gap:6px;
+}
+.content-type-btn:hover { border-color:rgba(99,102,241,0.3); color:var(--text); }
+.content-type-btn.active {
+  background:var(--purple-gradient); color:#fff; border-color:transparent;
+  box-shadow:0 4px 14px rgba(99,102,241,0.25);
+}
+
+/* 热点趋势卡片 */
+.trend-card {
+  background:rgba(255,255,255,0.95);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  border-radius:var(--radius);
+  padding:18px;
+  border:1px solid rgba(148,163,184,0.12);
+  box-shadow:var(--shadow);
+  transition:all .3s;
+  cursor:pointer;
+  position:relative;
+}
+.trend-card:hover { transform:translateY(-2px); box-shadow:var(--shadow-md); border-color:rgba(99,102,241,0.2); }
+.trend-card .tc-platform { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-light); margin-bottom:6px; font-weight:600; }
+.trend-card .tc-title { font-size:15px; font-weight:700; color:var(--text); line-height:1.5; margin-bottom:10px; }
+.trend-card .tc-meta { display:flex; gap:16px; font-size:12px; color:var(--text2); flex-wrap:wrap; }
+.trend-card .tc-meta span { display:flex; align-items:center; gap:4px; }
+.trend-card .tc-rank { 
+  position:absolute; top:16px; right:16px; 
+  font-size:28px; font-weight:800; opacity:0.08;
+}
+.trend-card .tc-tags { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+.trend-card .tc-tag {
+  font-size:10px; padding:3px 10px; border-radius:12px;
+  background:rgba(99,102,241,0.08); color:var(--primary); font-weight:600;
+}
+.trend-card .tc-tag.hot { background:rgba(239,68,68,0.08); color:#DC2626; }
+
+/* 工作流步骤 */
+.workflow-steps { display:flex; gap:0; margin-bottom:24px; }
+.workflow-step {
+  flex:1; text-align:center; position:relative; padding:12px 8px;
+  font-size:13px; font-weight:600; color:var(--text2);
+}
+.workflow-step::after {
+  content:''; position:absolute; top:50%; right:-50%; width:100%; height:2px;
+  background:rgba(148,163,184,0.2); z-index:0;
+}
+.workflow-step:last-child::after { display:none; }
+.workflow-step .ws-num {
+  width:32px; height:32px; border-radius:50%; background:rgba(148,163,184,0.12);
+  display:flex; align-items:center; justify-content:center; margin:0 auto 6px;
+  font-size:14px; font-weight:700; color:var(--text2); position:relative; z-index:1;
+}
+.workflow-step.active .ws-num { background:var(--purple-gradient); color:#fff; box-shadow:0 4px 14px rgba(99,102,241,0.3); }
+.workflow-step.complete .ws-num { background:linear-gradient(135deg, #10B981, #059669); color:#fff; box-shadow:0 4px 14px rgba(16,185,129,0.3); }
+
+/* 快速操作按钮组 */
+.quick-actions { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+.quick-act-btn {
+  padding:8px 16px; border:1px solid rgba(148,163,184,0.2);
+  border-radius:var(--radius-sm); font-size:12px; font-weight:600;
+  cursor:pointer; background:#fff; color:var(--text2); transition:all .2s;
+  display:flex; align-items:center; gap:6px;
+}
+.quick-act-btn:hover { border-color:var(--primary); color:var(--primary); background:rgba(99,102,241,0.03); }
+.quick-act-btn.accent:hover { border-color:var(--orange); color:var(--orange); background:rgba(249,115,22,0.03); }
+
+/* 彩色分割线 */
+.divider-gradient {
+  height:1px; border:none; background:linear-gradient(90deg, transparent, rgba(99,102,241,0.15), rgba(139,92,246,0.15), transparent);
+  margin:16px 0;
+}
+
+/* 空白状态美化 */
+.empty-state {
+  text-align:center; padding:60px 20px; color:var(--text2);
+}
+.empty-state .es-icon { font-size:56px; margin-bottom:16px; opacity:0.6; display:block; }
+.empty-state .es-title { font-size:16px; font-weight:600; color:var(--text); margin-bottom:8px; }
+.empty-state .es-desc { font-size:13px; margin-bottom:20px; }
+
+/* 面板卡片增强 */
+.panel-card {
+  background:rgba(255,255,255,0.95);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  border-radius:var(--radius);
+  padding:20px;
+  border:1px solid rgba(148,163,184,0.12);
+  box-shadow:var(--shadow);
+  margin-bottom:16px;
+  transition:all .3s;
+}
+.panel-card:hover { box-shadow:var(--shadow-md); }
+.panel-card h4 { font-size:14px; font-weight:700; color:var(--text); margin:0 0 12px; display:flex; align-items:center; gap:8px; }
+
+/* 发布工作台双栏 */
+.publish-workspace-v2 { display:flex; gap:20px; align-items:flex-start; }
+.publish-sidebar-v2 { width:260px; min-width:260px; flex-shrink:0; }
+.publish-main-v2 { flex:1; min-width:0; }
+
+/* 账号列表卡片增强 */
+.account-list-item {
+  display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:6px;
+  border-radius:var(--radius-sm); cursor:pointer; transition:all .2s;
+  border:1.5px solid transparent; background:rgba(255,255,255,0.7);
+}
+.account-list-item:hover { background:rgba(255,255,255,0.95); border-color:rgba(148,163,184,0.2); }
+.account-list-item.active {
+  background:linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.06));
+  border-color:rgba(99,102,241,0.3); box-shadow:0 0 0 3px rgba(99,102,241,0.06);
+}
+.account-list-item .ali-avatar {
+  width:36px; height:36px; border-radius:50%; background:var(--purple-gradient);
+  display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px; font-weight:700; flex-shrink:0;
+  box-shadow:0 4px 12px rgba(99,102,241,0.25);
+}
+.account-list-item .ali-info { flex:1; min-width:0; }
+.account-list-item .ali-name { font-size:13px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.account-list-item .ali-platform { font-size:11px; color:var(--text2); margin-top:1px; }
+.account-list-item .ali-status { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.account-list-item .ali-status.online { background:#10B981; box-shadow:0 0 8px rgba(16,185,129,0.4); }
+.account-list-item .ali-status.offline { background:#94A3B8; }
+
+/* 分页美化 */
+.pagination-bar { display:flex; gap:8px; align-items:center; justify-content:center; padding:16px 0; }
+.pagination-bar button {
+  min-width:36px; height:36px; padding:0 10px; border:1.5px solid rgba(148,163,184,0.2);
+  border-radius:var(--radius-sm); background:#fff; font-size:13px; font-weight:600;
+  cursor:pointer; transition:all .2s; color:var(--text2);
+}
+.pagination-bar button:hover { border-color:var(--primary); color:var(--primary); }
+.pagination-bar button.active { background:var(--purple-gradient); color:#fff; border-color:transparent; box-shadow:0 4px 12px rgba(99,102,241,0.3); }
+
+/* 发布操作栏 */
+.publish-action-bar {
+  display:flex; gap:10px; margin-top:16px; padding:16px;
+  background:linear-gradient(135deg, rgba(99,102,241,0.03), rgba(139,92,246,0.02));
+  border-radius:var(--radius); border:1px solid rgba(148,163,184,0.1);
+  align-items:center; flex-wrap:wrap;
+}
+.publish-action-bar .btn-lg { padding:12px 24px; font-size:14px; font-weight:700; }
+
+/* 提示/建议气泡 */
+.suggestion-bubble {
+  background:linear-gradient(135deg, #FFFBEB, #FEF3C7);
+  border:1px solid rgba(245,158,11,0.2);
+  border-radius:var(--radius-sm);
+  padding:12px 16px; font-size:13px; color:#92400E;
+  display:flex; align-items:flex-start; gap:10px; margin-top:10px;
+}
+.suggestion-bubble .sb-icon { font-size:16px; flex-shrink:0; }
+
+/* 平滑动画 */
+@keyframes fadeInUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+.animate-in { animation:fadeInUp .4s ease; }
+
+/* 标签云 */
+.tag-cloud { display:flex; gap:8px; flex-wrap:wrap; }
+.tag-pill {
+  padding:6px 14px; border-radius:20px; font-size:12px; font-weight:500;
+  border:1px solid rgba(148,163,184,0.2); background:#fff; color:var(--text2);
+  cursor:pointer; transition:all .2s;
+}
+.tag-pill:hover { border-color:var(--primary); color:var(--primary); background:rgba(99,102,241,0.03); }
+.tag-pill.selected { background:var(--purple-gradient); color:#fff; border-color:transparent; box-shadow:0 4px 12px rgba(99,102,241,0.25); }
+
+/* 右侧面板刷新 */
+.side-panel .side-stats { margin-top:12px; }
+.side-stat-row { display:flex; justify-content:space-between; padding:8px 0; font-size:12px; border-bottom:1px solid rgba(148,163,184,0.08); }
+.side-stat-row:last-child { border-bottom:none; }
+.side-stat-row .ss-label { color:var(--text2); }
+.side-stat-row .ss-value { font-weight:700; color:var(--text); }
+
+/* 提示信息条 */
+.info-bar {
+  display:flex; align-items:center; gap:10px; padding:12px 18px;
+  background:linear-gradient(135deg, rgba(59,130,246,0.04), rgba(6,182,212,0.04));
+  border:1px solid rgba(59,130,246,0.12); border-radius:var(--radius-sm);
+  font-size:13px; color:#1D4ED8; margin-bottom:16px;
+}
+
 </style>
 </head>
 <body>
@@ -1076,54 +1395,71 @@ a:hover { text-decoration:underline; }
   <!-- 侧边栏 -->
   <nav class="sidebar">
     <div class="sidebar-logo">
-      <span>🔷</span> AI 获客
+      <span>🔷</span> AI 获客 <small style="font-size:10px;opacity:0.6;font-weight:400">v1.1</small>
     </div>
 
     <div class="sidebar-section">
       <div class="sidebar-section-title">工作台</div>
       <button class="sidebar-item active" onclick="switchTabSidebar('dashboard', this)">
-        <span class="nav-icon">🏠</span> 主页
+        <span class="nav-icon">🏠</span> 首页看板
       </button>
       <button class="sidebar-item" onclick="switchTabSidebar('publish', this)">
-        <span class="nav-icon">📤</span> 内容发布
+        <span class="nav-icon">✍️</span> 内容创作
+        <span class="nav-badge" style="background:rgba(16,185,129,0.15);color:#059669;display:inline-flex" id="publishBadge">NEW</span>
       </button>
       <button class="sidebar-item" onclick="switchTabSidebar('video', this)">
-        <span class="nav-icon">🎬</span> 视频创作
-      </button>
-      <button class="sidebar-item" onclick="switchTabSidebar('review', this)">
-        <span class="nav-icon">✅</span> 内容审核
-        <span class="nav-badge" id="reviewBadge" style="display:none">0</span>
+        <span class="nav-icon">🎬</span> 视频工坊
       </button>
     </div>
 
     <div class="sidebar-section">
-      <div class="sidebar-section-title">数据</div>
+      <div class="sidebar-section-title">增长引擎</div>
+      <button class="sidebar-item" onclick="switchTabSidebar('hottopics', this)">
+        <span class="nav-icon">🔥</span> 热点选题
+      </button>
+      <button class="sidebar-item" onclick="switchTabSidebar('leads', this)">
+        <span class="nav-icon">🎯</span> 线索管理
+      </button>
+      <button class="sidebar-item" onclick="switchTabSidebar('tasks', this)">
+        <span class="nav-icon">⚡</span> 获客任务
+      </button>
+      <button class="sidebar-item" onclick="switchTabSidebar('inbox', this)">
+        <span class="nav-icon">💬</span> 互动收件箱
+        <span class="nav-badge" id="inboxBadge" style="display:none">0</span>
+      </button>
+      <button class="sidebar-item" onclick="switchTabSidebar('followup', this)">
+        <span class="nav-icon">📈</span> 私域转化
+      </button>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">内容运营</div>
+      <button class="sidebar-item" onclick="switchTabSidebar('review', this)">
+        <span class="nav-icon">✅</span> 内容审核
+        <span class="nav-badge" id="reviewBadge" style="display:none">0</span>
+      </button>
+      <button class="sidebar-item" onclick="switchTabSidebar('optimization', this)">
+        <span class="nav-icon">✨</span> 智能优化
+      </button>
+      <button class="sidebar-item" onclick="switchTabSidebar('competitor', this)">
+        <span class="nav-icon">🔍</span> 竞争情报
+      </button>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">数据中心</div>
       <button class="sidebar-item" onclick="switchTabSidebar('data', this)">
         <span class="nav-icon">📊</span> 数据洞察
       </button>
     </div>
 
     <div class="sidebar-section">
-      <div class="sidebar-section-title">获客引擎</div>
-      <button class="sidebar-item" onclick="switchTabSidebar('leads', this)">
-        <span class="nav-icon">👥</span> 客户管理
-      </button>
-      <button class="sidebar-item" onclick="switchTabSidebar('tasks', this)">
-        <span class="nav-icon">🎯</span> 获客任务
-      </button>
-      <button class="sidebar-item" onclick="switchTabSidebar('inbox', this)">
-        <span class="nav-icon">📬</span> 消息收件箱
-        <span class="nav-badge" id="inboxBadge" style="display:none">0</span>
-      </button>
-    </div>
-
-    <div class="sidebar-section">
-      <div class="sidebar-section-title">资产管理</div>
+      <div class="sidebar-section-title">资源管理</div>
       <button class="sidebar-item" onclick="switchTabSidebar('accounts', this)">
         <span class="nav-icon">📱</span> 平台账号
       </button>
       <button class="sidebar-item" onclick="switchTabSidebar('templates', this)">
-        <span class="nav-icon">📝</span> 素材库
+        <span class="nav-icon">📝</span> 素材模板
       </button>
       <button class="sidebar-item" onclick="switchTabSidebar('topics', this)">
         <span class="nav-icon">💡</span> 选题库
@@ -1134,9 +1470,9 @@ a:hover { text-decoration:underline; }
     </div>
 
     <div class="sidebar-section">
-      <div class="sidebar-section-title">团队</div>
+      <div class="sidebar-section-title">管理</div>
       <button class="sidebar-item" onclick="switchTabSidebar('team', this)">
-        <span class="nav-icon">👥</span> 团队管理
+        <span class="nav-icon">👥</span> 团队协作
       </button>
     </div>
   </nav>
@@ -1146,7 +1482,12 @@ a:hover { text-decoration:underline; }
 
   <!-- 客户管理 -->
   <div id="tab-leads">
-    <div class="toolbar">
+    <div class="section-header" style="margin-bottom:14px">
+      <h2>🎯 线索管理</h2>
+      <span class="badge-count" style="background:linear-gradient(135deg,#F59E0B,#D97706)" id="leadsTotalCount">0 条</span>
+      <span class="sub-desc">AI 评分驱动的客户线索管理中心</span>
+    </div>
+    <div class="toolbar" style="background:rgba(255,255,255,0.9);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:14px;border:1px solid rgba(148,163,184,0.12)">
       <input type="text" id="leadSearch" placeholder="搜索客户名/公司/邮箱..." oninput="loadLeads()">
       <select id="leadStatusF" onchange="loadLeads()">
         <option value="">全部状态</option><option value="new">新线索</option><option value="scored">已评分</option>
@@ -1580,7 +1921,11 @@ a:hover { text-decoration:underline; }
 <!-- 消息收件箱 (PRD 4.2) -->
 <!-- ════════════════════════════════════════ -->
 <div id="tab-inbox" style="display:none">
-  <div class="toolbar">
+  <div class="section-header" style="margin-bottom:14px">
+    <h2>💬 互动收件箱</h2>
+    <span class="sub-desc">统一管理多平台私信评论与互动</span>
+  </div>
+  <div class="toolbar" style="background:rgba(255,255,255,0.9);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:14px;border:1px solid rgba(148,163,184,0.12)">
     <select id="inboxPlatformF" onchange="loadInbox()">
       <option value="">全部平台</option>
       <option value="zhihu">知乎</option><option value="weibo">微博</option>
@@ -1609,11 +1954,11 @@ a:hover { text-decoration:underline; }
   </div>
 
   <!-- 统计概览 -->
-  <div class="stats" id="inboxStats" style="margin-bottom:14px">
-    <div class="stat-card"><div class="label">未读消息</div><div class="value" style="color:var(--red)" id="inboxUnreadTotal">0</div></div>
-    <div class="stat-card"><div class="label">潜在客户</div><div class="value" style="color:var(--green)" id="inboxLeadCount">0</div></div>
-    <div class="stat-card"><div class="label">负面评价</div><div class="value" style="color:var(--red)" id="inboxNegCount">0</div></div>
-    <div class="stat-card"><div class="label">今日新增</div><div class="value" style="color:var(--primary)" id="inboxTodayNew">0</div></div>
+  <div class="kpi-grid" id="inboxStats" style="margin-bottom:14px">
+    <div class="kpi-card"><span class="kpi-icon">📬</span><div class="kpi-value" style="color:#DC2626" id="inboxUnreadTotal">0</div><div class="kpi-label">未读消息</div></div>
+    <div class="kpi-card"><span class="kpi-icon">🎯</span><div class="kpi-value" style="color:#059669" id="inboxLeadCount">0</div><div class="kpi-label">潜在客户</div></div>
+    <div class="kpi-card"><span class="kpi-icon">⚠️</span><div class="kpi-value" style="color:#D97706" id="inboxNegCount">0</div><div class="kpi-label">负面评价</div></div>
+    <div class="kpi-card"><span class="kpi-icon">🆕</span><div class="kpi-value" style="color:var(--primary)" id="inboxTodayNew">0</div><div class="kpi-label">今日新增</div></div>
   </div>
 
   <div class="table-card">
@@ -1632,70 +1977,90 @@ a:hover { text-decoration:underline; }
 </div>
 
 <!-- ════════════════════════════════════════ -->
-<!-- 主页 Dashboard (PRD 4.6 重设计) -->
+<!-- 主页 Dashboard (v1.1 全面美化) -->
 <!-- ════════════════════════════════════════ -->
 <div id="tab-dashboard">
   <div class="homepage">
     <!-- 左侧 -->
     <div class="home-left">
-      <!-- 两个大卡片 -->
-      <div class="hero-cards">
-        <div class="hero-card" onclick="switchTabSidebar('publish')">
-          <div class="hero-card-icon publish">📤</div>
-          <div class="hero-card-info">
-            <div class="hero-card-title">开始发布</div>
-            <div class="hero-card-desc" id="homePublishDesc">一站式跨平台内容发布</div>
-            <div class="hero-card-stat" id="homePublishStat">加载中...</div>
-          </div>
+      <!-- 欢迎横幅 -->
+      <div class="greeting-banner">
+        <div class="gb-icon">👋</div>
+        <div class="gb-text">
+          <h3 id="greetingText">欢迎回来</h3>
+          <p id="greetingSub">今天又是增长的一天，来看看获客数据吧</p>
         </div>
-        <div class="hero-card" onclick="switchTabSidebar('accounts')">
-          <div class="hero-card-icon account">📱</div>
-          <div class="hero-card-info">
-            <div class="hero-card-title">授权账号</div>
-            <div class="hero-card-desc" id="homeAccountDesc">管理您的多平台账号</div>
-            <div class="hero-card-stat" id="homeAccountStat">加载中...</div>
-          </div>
+        <div class="gb-actions">
+          <button class="btn btn-sm" onclick="switchTabSidebar('publish')" style="background:var(--purple-gradient);color:#fff;border:none;padding:8px 18px;border-radius:20px;font-weight:700;cursor:pointer">✍️ 快速创作</button>
+          <button class="btn btn-sm" onclick="switchTabSidebar('hottopics')" style="background:#fff;color:var(--text);border:1.5px solid rgba(148,163,184,0.2);padding:8px 18px;border-radius:20px;font-weight:600;cursor:pointer">🔥 热点选题</button>
+        </div>
+      </div>
+
+      <!-- 核心KPI -->
+      <div class="kpi-grid" id="kpiGrid">
+        <div class="kpi-card" onclick="switchTabSidebar('accounts')">
+          <span class="kpi-icon">📱</span>
+          <div class="kpi-value" id="kpiAccounts">--</div>
+          <div class="kpi-label">授权账号</div>
+        </div>
+        <div class="kpi-card" onclick="switchTabSidebar('publish')">
+          <span class="kpi-icon">📄</span>
+          <div class="kpi-value" id="kpiPublished">--</div>
+          <div class="kpi-label">已发布内容</div>
+        </div>
+        <div class="kpi-card" onclick="switchTabSidebar('leads')">
+          <span class="kpi-icon">🎯</span>
+          <div class="kpi-value" id="kpiLeads">--</div>
+          <div class="kpi-label">获客线索</div>
+        </div>
+        <div class="kpi-card" onclick="switchTabSidebar('inbox')">
+          <span class="kpi-icon">💬</span>
+          <div class="kpi-value" id="kpiInbox">--</div>
+          <div class="kpi-label">待处理消息</div>
         </div>
       </div>
 
       <!-- 常用入口 -->
-      <div class="section-title">⚡ 常用入口</div>
+      <div class="section-title" style="display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:14px;font-weight:700;color:var(--text)">⚡ 快捷入口</div>
       <div class="quick-entries">
+        <div class="quick-entry" onclick="switchTabSidebar('publish')">
+          <span class="qe-icon">✍️</span>
+          <div class="qe-name">AI 写作</div>
+          <div class="qe-desc">智能生成多平台内容</div>
+        </div>
+        <div class="quick-entry" onclick="switchTabSidebar('hottopics')">
+          <span class="qe-icon">🔥</span>
+          <div class="qe-name">热点选题</div>
+          <div class="qe-desc">追踪全网热门话题</div>
+        </div>
         <div class="quick-entry" onclick="switchTabSidebar('leads')">
-          <span class="qe-icon">👥</span>
-          <div class="qe-name">客户管理</div>
-          <div class="qe-desc">AI评分的获客线索</div>
+          <span class="qe-icon">🎯</span>
+          <div class="qe-name">线索管理</div>
+          <div class="qe-desc">AI 评分智能筛选</div>
         </div>
         <div class="quick-entry" onclick="switchTabSidebar('tasks')">
-          <span class="qe-icon">🎯</span>
+          <span class="qe-icon">⚡</span>
           <div class="qe-name">获客任务</div>
-          <div class="qe-desc">自动化执行与跟踪</div>
+          <div class="qe-desc">自动化执行跟踪</div>
         </div>
         <div class="quick-entry" onclick="switchTabSidebar('inbox')">
-          <span class="qe-icon">📬</span>
-          <div class="qe-name">消息收件箱</div>
+          <span class="qe-icon">💬</span>
+          <div class="qe-name">互动收件箱</div>
           <div class="qe-desc" id="homeInboxDesc">私信评论统一管理</div>
         </div>
-        <div class="quick-entry" onclick="switchTabSidebar('templates')">
-          <span class="qe-icon">📝</span>
-          <div class="qe-name">素材库</div>
-          <div class="qe-desc">内容模板与话术</div>
-        </div>
-        <div class="quick-entry" onclick="switchTabSidebar('topics')">
-          <span class="qe-icon">💡</span>
-          <div class="qe-name">选题库</div>
-          <div class="qe-desc">热点话题与灵感</div>
-        </div>
-        <div class="quick-entry" onclick="switchTabSidebar('knowledge')">
-          <span class="qe-icon">📚</span>
-          <div class="qe-name">知识库</div>
-          <div class="qe-desc">产品知识与FAQ</div>
+        <div class="quick-entry" onclick="switchTabSidebar('data')">
+          <span class="qe-icon">📊</span>
+          <div class="qe-name">数据洞察</div>
+          <div class="qe-desc">多维度数据报表</div>
         </div>
       </div>
 
-      <!-- 核心指标 -->
-      <div class="section-title">📊 核心指标</div>
-      <div class="stats" id="dashboardCards"><div class="loading"><span class="spinner"></span>加载中...</div></div>
+      <!-- 最近动态区域 -->
+      <div class="section-title" style="display:flex;align-items:center;gap:8px;margin:18px 0 14px;font-size:14px;font-weight:700;color:var(--text)">📋 最近动态</div>
+      <div class="panel-card" id="recentActivity" style="min-height:100px">
+        <div class="loading"><span class="spinner"></span>加载中...</div>
+      </div>
+
     </div>
 
     <!-- 右侧边栏 -->
@@ -1710,7 +2075,7 @@ a:hover { text-decoration:underline; }
           </div>
         </div>
 
-        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:14px">📋 用量配额</div>
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:14px">📋 用量配额</div>
 
         <div class="quota-item">
           <div class="quota-label"><span>授权账号</span><span id="quotaAccounts">0 / 10</span></div>
@@ -1733,6 +2098,15 @@ a:hover { text-decoration:underline; }
           <div class="quota-bar"><div class="quota-bar-fill ok" id="quotaAIBar" style="width:0%"></div></div>
         </div>
 
+        <!-- 快捷数据 -->
+        <div class="divider-gradient"></div>
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">📈 今日概览</div>
+        <div class="side-stats" id="sideStatsToday">
+          <div class="side-stat-row"><span class="ss-label">新增线索</span><span class="ss-value" style="color:#059669" id="ssLeads">--</span></div>
+          <div class="side-stat-row"><span class="ss-label">内容发布</span><span class="ss-value" style="color:var(--primary)" id="ssPublished">--</span></div>
+          <div class="side-stat-row"><span class="ss-label">互动消息</span><span class="ss-value" style="color:#D97706" id="ssMessages">--</span></div>
+        </div>
+
         <button class="side-action-btn upgrade" onclick="toast('升级功能即将上线', 'info')">🚀 升级专业版</button>
         <div class="side-links">
           <a onclick="getAISuggestion()">📖 使用手册</a>
@@ -1747,30 +2121,128 @@ a:hover { text-decoration:underline; }
 <!-- 内容发布工作台 (PRD 4.7) -->
 <!-- ════════════════════════════════════════ -->
 <div id="tab-publish" style="display:none">
-  <div class="section-title">📤 内容发布工作台</div>
-  <div class="publish-workspace">
-    <!-- 左侧：账号选择 -->
-    <div class="publish-sidebar" id="publishAccountList">
-      <div class="loading-text">加载账号中...</div>
+  <!-- 页面头部 -->
+  <div class="section-header" style="margin-bottom:16px">
+    <h2>✍️ 内容创作工作台</h2>
+    <span class="badge-count" style="background:linear-gradient(135deg,#6366F1,#8B5CF6)">AI 驱动</span>
+    <span class="sub-desc" style="margin-left:auto;font-size:13px">选择账号 → 生成内容 → 一键发布</span>
+  </div>
+
+  <!-- 工作流程步骤指示器 -->
+  <div class="workflow-steps">
+    <div class="workflow-step active" id="wfStep1"><div class="ws-num">1</div>选择账号</div>
+    <div class="workflow-step" id="wfStep2"><div class="ws-num">2</div>AI 生成</div>
+    <div class="workflow-step" id="wfStep3"><div class="ws-num">3</div>编辑润色</div>
+    <div class="workflow-step" id="wfStep4"><div class="ws-num">4</div>发布上线</div>
+  </div>
+
+  <!-- 热点话题推荐横条 -->
+  <div class="hot-topic-bar" id="publishHotTopicBar">
+    <div class="ht-label">🔥 实时热点</div>
+    <div class="ht-chips" id="hotTopicChips">
+      <span class="hot-topic-chip" onclick="useHotTopic(this)"><span class="spinner" style="width:14px;height:14px;border-width:2px"></span></span>
     </div>
+    <span class="ht-more" onclick="switchTabSidebar('hottopics')">查看更多 →</span>
+  </div>
+
+  <div class="publish-workspace-v2">
+    <!-- 左侧：账号列表 -->
+    <div class="publish-sidebar-v2">
+      <div class="panel-card" style="padding:14px">
+        <h4 style="margin:0 0 10px">📱 选择账号</h4>
+        <div id="publishAccountList" style="max-height:400px;overflow-y:auto">
+          <div class="loading-text">加载账号中...</div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="switchTabSidebar('accounts')" style="width:100%;margin-top:10px;font-size:12px">+ 添加账号</button>
+      </div>
+    </div>
+
     <!-- 右侧：编辑区 -->
-    <div class="publish-main">
-      <!-- 快速入口 -->
-      <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end">
-        <div style="flex:1;min-width:180px">
-          <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px">主题 / 方向</label>
-          <input type="text" id="publishTopic" placeholder="如：AI工具分享、行业洞察、技术干货..." style="width:100%;padding:9px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px">
+    <div class="publish-main-v2">
+      <!-- 主题输入区 -->
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">创作主题</label>
+          <input type="text" id="publishTopic" placeholder="输入主题关键词，如：AI工具推荐、行业洞察..." style="width:100%;padding:10px 14px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:14px;transition:all .3s" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(99,102,241,0.08)'" onblur="this.style.borderColor='rgba(148,163,184,0.3)';this.style.boxShadow='none'">
         </div>
-        <div style="flex:1;min-width:160px">
-          <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px">风格提示（可选）</label>
-          <input type="text" id="publishStyleHint" placeholder="如：专业、幽默、温暖..." style="width:100%;padding:9px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px">
+        <button class="btn btn-lg" onclick="doPublishGenerate()" style="background:var(--purple-gradient);color:#fff;border:none;padding:10px 24px;font-size:14px;font-weight:700;border-radius:var(--radius-sm);box-shadow:0 4px 16px rgba(99,102,241,0.3);cursor:pointer;white-space:nowrap">🤖 AI 生成内容</button>
+      </div>
+
+      <!-- 内容类型快捷选择 -->
+      <div class="content-type-group" style="margin-top:12px">
+        <div class="content-type-btn active" onclick="setContentType('article', this)">📝 图文文章</div>
+        <div class="content-type-btn" onclick="setContentType('note', this)">📌 动态笔记</div>
+        <div class="content-type-btn" onclick="setContentType('video', this)">🎬 短视频脚本</div>
+        <div class="content-type-btn" onclick="setContentType('qa', this)">❓ 问答内容</div>
+        <div class="content-type-btn" onclick="setContentType('thread', this)">🧵 话题串</div>
+        <input type="hidden" id="publishContentType" value="article">
+      </div>
+
+      <!-- 高级选项面板 -->
+      <div class="publish-advanced" id="publishAdvancedPanel">
+        <div class="pa-header" onclick="toggleAdvancedOptions()">
+          ⚙️ 高级选项 <span class="pa-arrow" id="paArrow">▾</span>
+          <span style="font-size:11px;font-weight:400;color:var(--text-light);margin-left:8px" id="paSummary">风格、长度、平台策略等</span>
         </div>
-        <button class="btn btn-primary btn-lg" onclick="doPublishGenerate()" style="height:42px;min-width:140px">🤖 AI 生成内容</button>
+        <div class="pa-body" id="paBody">
+          <div class="pa-field">
+            <label>🎭 内容风格</label>
+            <select id="publishStyle">
+              <option value="auto">智能适配</option>
+              <option value="professional">专业权威</option>
+              <option value="casual">轻松活泼</option>
+              <option value="storytelling">故事叙述</option>
+              <option value="inspirational">励志共鸣</option>
+              <option value="humorous">幽默风趣</option>
+              <option value="data-driven">数据驱动</option>
+            </select>
+          </div>
+          <div class="pa-field">
+            <label>📏 内容长度</label>
+            <select id="publishLength">
+              <option value="auto">智能适配</option>
+              <option value="short">短篇 (200-500字)</option>
+              <option value="medium" selected>中篇 (500-1000字)</option>
+              <option value="long">长篇 (1000-2000字)</option>
+            </select>
+          </div>
+          <div class="pa-field">
+            <label>🎯 目标受众</label>
+            <select id="publishAudience">
+              <option value="general">大众通用</option>
+              <option value="tech">技术人群</option>
+              <option value="business">商务人士</option>
+              <option value="student">学生群体</option>
+              <option value="creator">内容创作者</option>
+            </select>
+          </div>
+          <div class="pa-field">
+            <label>🏷️ SEO关键词</label>
+            <input type="text" id="publishKeywords" placeholder="用逗号分隔，如：AI,效率工具,副业">
+          </div>
+          <div class="pa-field">
+            <label>📋 平台策略</label>
+            <select id="publishStrategy">
+              <option value="adaptive">自适应平台特性</option>
+              <option value="uniform">统一内容风格</option>
+            </select>
+          </div>
+          <div class="pa-field">
+            <label>💬 互动引导</label>
+            <select id="publishCTA">
+              <option value="auto">智能生成</option>
+              <option value="comment">引导评论讨论</option>
+              <option value="follow">引导关注</option>
+              <option value="share">引导转发分享</option>
+              <option value="none">不添加引导</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <!-- AI 候选列表 -->
       <div id="publishCandidates" style="margin-bottom:14px;display:none">
-        <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--text)">AI 候选版本（点击选中）</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text);display:flex;align-items:center;gap:8px">✨ AI 候选版本 <span style="font-size:11px;font-weight:400;color:var(--text2)">点击选择</span></div>
         <div id="publishCandidatesList" style="display:flex;flex-direction:column;gap:8px"></div>
       </div>
 
@@ -1784,47 +2256,41 @@ a:hover { text-decoration:underline; }
           </div>
         </div>
         <div id="publishEditorContainer" style="background:#fff;border-radius:var(--radius-sm)">
-          <div id="publishEditor"><p style="color:var(--text2);text-align:center;padding:60px 20px">请在左侧选择一个账号开始创作</p></div>
+          <div id="publishEditor"><p style="color:var(--text2);text-align:center;padding:60px 20px">👈 请在左侧选择一个账号，然后输入主题开始创作</p></div>
         </div>
         <div id="publishPreviewArea" style="display:none"></div>
       </div>
 
-      <!-- 内容类型 + 原创检测 -->
-      <div style="display:flex;gap:10px;margin-top:14px;align-items:center;flex-wrap:wrap">
-        <label style="font-size:13px;color:var(--text2)">内容类型：</label>
-        <select id="publishContentType" style="padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px">
-          <option value="article">图文 / 文章</option>
-          <option value="video">短视频</option>
-          <option value="note">动态 / 笔记</option>
-        </select>
-        <button class="btn btn-outline btn-sm" onclick="checkOriginality()" id="btnOriginality">🔍 原创检测</button>
-        <span id="originalityQuickResult" style="font-size:13px;color:var(--text2)"></span>
+      <!-- 内容工具条 -->
+      <div class="quick-actions" style="margin-top:12px">
+        <span style="font-size:12px;color:var(--text2);font-weight:600;margin-right:4px">工具：</span>
+        <button class="quick-act-btn" onclick="checkOriginality()" id="btnOriginality">🔍 原创检测</button>
+        <button class="quick-act-btn" onclick="doPublishGenerate()">🤖 重新生成</button>
+        <button class="quick-act-btn" onclick="clearPublishEditor()">🗑 清空内容</button>
       </div>
 
-      <div id="originalityPanel" class="origin-panel" style="display:none">
+      <div id="originalityPanel" class="origin-panel" style="display:none;margin-top:8px">
         <div id="originalityResult"></div>
       </div>
 
       <!-- 操作栏 -->
-      <div style="display:flex;gap:10px;margin-top:14px;align-items:center;flex-wrap:wrap">
-        <button class="btn btn-green btn-lg" onclick="doPublishExecute()">📤 立即发布</button>
-        <button class="btn btn-primary btn-lg" onclick="submitForReview()">📨 提交审核</button>
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none;padding:8px 14px;background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm)">
+      <div class="publish-action-bar">
+        <button class="btn btn-green btn-lg" onclick="doPublishExecute()" style="padding:12px 28px;font-size:14px;font-weight:700;box-shadow:0 4px 16px rgba(16,185,129,0.25)">📤 一键发布</button>
+        <button class="btn btn-primary btn-lg" onclick="submitForReview()" style="padding:12px 28px;font-size:14px;font-weight:700">📨 提交审核</button>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;user-select:none;padding:10px 16px;background:#fff;border:1.5px solid rgba(148,163,184,0.2);border-radius:var(--radius-sm);font-weight:600;transition:all .2s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='rgba(148,163,184,0.2)'">
           <input type="checkbox" id="publishScheduleToggle" onchange="toggleScheduleUI()"> ⏰ 定时发布
         </label>
-        <span id="publishScheduleInputs" style="display:none;gap:6px;align-items:center">
-          <input type="date" id="publishScheduledDate" style="padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;width:135px">
-          <input type="time" id="publishScheduledTime" value="09:00" style="padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;width:115px">
+        <span id="publishScheduleInputs" style="display:none;gap:8px;align-items:center">
+          <input type="date" id="publishScheduledDate" style="padding:8px 12px;border:1.5px solid rgba(148,163,184,0.2);border-radius:var(--radius-sm);font-size:13px;width:140px">
+          <input type="time" id="publishScheduledTime" value="09:00" style="padding:8px 12px;border:1.5px solid rgba(148,163,184,0.2);border-radius:var(--radius-sm);font-size:13px;width:120px">
         </span>
-        <button class="btn btn-outline btn-sm" onclick="clearPublishEditor()" style="margin-left:auto">🗑 清空</button>
-        <button class="btn btn-outline btn-sm" onclick="doPublishGenerate()">🤖 重新生成</button>
       </div>
 
       <div id="publishResult" style="margin-top:12px;display:none"></div>
 
       <!-- 发布历史 -->
       <div class="publish-history" style="margin-top:24px">
-        <div class="section-title">📋 最近发布</div>
+        <div class="section-title" style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:14px;font-weight:700">📋 近期发布</div>
         <div id="publishHistoryList">
           <div class="loading-text">加载中...</div>
         </div>
@@ -1837,7 +2303,12 @@ a:hover { text-decoration:underline; }
 <!-- 数据洞察 -->
 <!-- ════════════════════════════════════════ -->
 <div id="tab-data" class="data-module" style="display:none">
-  <div class="section-title">📊 数据洞察</div>
+  <div class="section-header">
+    <h2>📊 数据洞察</h2>
+    <span class="sub-desc">多维度数据分析与报表</span>
+    <div style="flex:1"></div>
+    <button class="btn btn-outline btn-sm" onclick="exportDataCSV()" style="background:#fff;border:1.5px solid rgba(148,163,184,0.2);border-radius:var(--radius-sm);padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer">📥 导出数据</button>
+  </div>
 
   <div class="data-subnav" id="dataSubnav">
     <div class="data-nav-item active" onclick="switchDataView('dashboard')">仪表盘</div>
@@ -1861,7 +2332,6 @@ a:hover { text-decoration:underline; }
       <input type="date" id="dataEndDate">
       <button class="btn btn-primary btn-sm" onclick="applyDataDateRange()">确定</button>
     </div>
-    <button class="btn btn-outline btn-sm" onclick="exportDataCSV()">📥 导出数据</button>
   </div>
 
   <!-- 仪表盘 -->
@@ -1957,11 +2427,15 @@ a:hover { text-decoration:underline; }
 <!-- 内容审核 -->
 <!-- ════════════════════════════════════════ -->
 <div id="tab-review" style="display:none">
-  <div class="section-title">✅ 多级内容审核</div>
-  <div class="review-header" id="reviewStats">
-    <div class="review-stat"><b id="reviewPendingCount">-</b><span>待审核</span></div>
-    <div class="review-stat"><b id="reviewApprovedCount">-</b><span>已通过</span></div>
-    <div class="review-stat"><b id="reviewRejectedCount">-</b><span>已驳回</span></div>
+  <div class="section-header">
+    <h2>✅ 内容审核中心</h2>
+    <span class="sub-desc">确保发布内容质量与合规</span>
+  </div>
+  <div class="kpi-grid" style="margin-bottom:16px">
+    <div class="kpi-card"><span class="kpi-icon">⏳</span><div class="kpi-value" id="reviewPendingCountValue" style="color:#D97706">--</div><div class="kpi-label">待审核</div></div>
+    <div class="kpi-card"><span class="kpi-icon">✅</span><div class="kpi-value" id="reviewApprovedCountValue" style="color:#059669">--</div><div class="kpi-label">已通过</div></div>
+    <div class="kpi-card"><span class="kpi-icon">❌</span><div class="kpi-value" id="reviewRejectedCountValue" style="color:#DC2626">--</div><div class="kpi-label">已驳回</div></div>
+    <div class="kpi-card"><span class="kpi-icon">📅</span><div class="kpi-value" id="reviewTodayCount" style="color:var(--primary)">--</div><div class="kpi-label">今日提交</div></div>
   </div>
   <div id="reviewQueue">
     <div class="loading-text">加载中...</div>
@@ -1972,39 +2446,69 @@ a:hover { text-decoration:underline; }
 <!-- 视频创作 -->
 <!-- ════════════════════════════════════════ -->
 <div id="tab-video" style="display:none">
-  <div class="section-title">🎬 视频创作</div>
+  <div class="section-header">
+    <h2>🎬 视频工坊</h2>
+    <span class="sub-desc">AI 驱动的短视频脚本创作</span>
+  </div>
   <div class="video-workspace">
     <div class="video-sidebar">
-      <h4 style="font-size:14px;margin-bottom:10px">支持平台</h4>
-      <div id="videoPlatformsList" style="font-size:13px;color:var(--text2);line-height:1.8">
-        加载中...
+      <div class="panel-card" style="padding:14px">
+        <h4 style="margin:0 0 10px;font-size:13px">📋 支持平台</h4>
+        <div id="videoPlatformsList" style="font-size:13px;color:var(--text2);line-height:2">
+          加载中...
+        </div>
       </div>
     </div>
     <div class="video-form">
-      <label>视频主题 / 选题</label>
-      <input type="text" id="videoTopic" placeholder="如：AI工具如何提升获客效率">
-      <label>风格</label>
-      <input type="text" id="videoStyle" value="轻松口播" placeholder="轻松口播 / 专业讲解 / 剧情化">
-      <label>时长（秒）</label>
-      <select id="videoDuration">
-        <option value="15">15 秒</option>
-        <option value="30">30 秒</option>
-        <option value="60">60 秒</option>
-        <option value="120">2 分钟</option>
-      </select>
-      <label>目标平台（可选）</label>
-      <select id="videoPlatform"><option value="">通用</option></select>
-      <button class="btn btn-primary btn-lg" style="margin-top:14px" onclick="generateVideoScript()">🤖 AI 生成视频脚本</button>
-      <div id="videoScriptResult"></div>
-      <div id="videoUploadSection" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
-        <label>视频链接（合成后回填）</label>
-        <input type="text" id="videoUrl" placeholder="https://...">
-        <label>标题</label>
-        <input type="text" id="videoTitle">
-        <label>发布账号</label>
-        <select id="videoAccountSelect"></select>
-        <div style="display:flex;gap:10px;margin-top:12px">
-          <button class="btn btn-green" onclick="submitVideoPublish()">提交发布</button>
+      <div class="panel-card" style="padding:20px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div style="grid-column:1/-1">
+            <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">视频主题</label>
+            <input type="text" id="videoTopic" placeholder="如：AI工具如何提升获客效率" style="width:100%;padding:10px 14px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:14px;transition:all .3s" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='rgba(148,163,184,0.3)'">
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">风格</label>
+            <select id="videoStyle" style="width:100%;padding:9px 14px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:13px;background:#fff">
+              <option value="轻松口播">轻松口播</option>
+              <option value="专业讲解">专业讲解</option>
+              <option value="剧情化">剧情化</option>
+              <option value="Vlog记录">Vlog记录</option>
+              <option value="访谈对话">访谈对话</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">时长</label>
+            <select id="videoDuration" style="width:100%;padding:9px 14px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:13px;background:#fff">
+              <option value="15">15 秒</option><option value="30">30 秒</option>
+              <option value="60">60 秒</option><option value="120">2 分钟</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:14px">
+          <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">目标平台（可选）</label>
+          <select id="videoPlatform" style="width:100%;max-width:300px;padding:9px 14px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:13px;background:#fff"><option value="">通用</option></select>
+        </div>
+        <button class="btn btn-lg" onclick="generateVideoScript()" style="margin-top:16px;background:var(--purple-gradient);color:#fff;border:none;padding:12px 28px;font-size:14px;font-weight:700;border-radius:var(--radius-sm);box-shadow:0 4px 16px rgba(99,102,241,0.3);cursor:pointer">🤖 AI 生成视频脚本</button>
+        <div id="videoScriptResult" style="margin-top:16px"></div>
+      </div>
+      <div id="videoUploadSection" style="display:none;margin-top:16px">
+        <div class="panel-card" style="padding:20px">
+          <h4 style="margin:0 0 14px;font-size:13px">📤 发布设置</h4>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div>
+              <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">视频链接</label>
+              <input type="text" id="videoUrl" placeholder="https://..." style="width:100%;padding:10px 14px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:13px">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">标题</label>
+              <input type="text" id="videoTitle" style="width:100%;padding:10px 14px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:13px">
+            </div>
+          </div>
+          <div style="margin-top:14px">
+            <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">发布账号</label>
+            <select id="videoAccountSelect" style="width:100%;max-width:300px;padding:9px 14px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:13px;background:#fff"></select>
+          </div>
+          <button class="btn btn-green btn-lg" onclick="submitVideoPublish()" style="margin-top:16px;padding:12px 28px">提交发布</button>
         </div>
       </div>
       <div id="videoResult" style="margin-top:12px"></div>
@@ -2104,6 +2608,130 @@ a:hover { text-decoration:underline; }
   </div>
 </div>
 
+<!-- ════════════════════════════════════════ -->
+<!-- 🔥 热点选题引擎 v1.2 -->
+<!-- ════════════════════════════════════════ -->
+<div id="tab-hottopics" style="display:none">
+  <div class="section-header">
+    <h2>🔥 热点选题引擎</h2>
+    <span class="badge-count" style="background:linear-gradient(135deg,#F97316,#EA580C)" id="hotCountBadge">0 条</span>
+    <span class="sub-desc">实时追踪全网热点，智能匹配创作选题</span>
+  </div>
+
+  <!-- KPI指标 -->
+  <div class="kpi-grid">
+    <div class="kpi-card"><span class="kpi-icon">📡</span><div class="kpi-value" id="hotTotalCount">--</div><div class="kpi-label">热点总数</div></div>
+    <div class="kpi-card"><span class="kpi-icon">⚡</span><div class="kpi-value" id="hotHighScore">--</div><div class="kpi-label">高分热点 (&gt;70)</div></div>
+    <div class="kpi-card"><span class="kpi-icon">📈</span><div class="kpi-value" id="hotAvgScore">--</div><div class="kpi-label">平均热度</div></div>
+    <div class="kpi-card"><span class="kpi-icon">🆕</span><div class="kpi-value" id="hotNewToday">--</div><div class="kpi-label">今日新增</div></div>
+  </div>
+
+  <!-- 筛选栏 -->
+  <div class="panel-card" style="padding:14px 18px">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+      <select id="hotPlatformF" style="padding:8px 14px;border:1.5px solid rgba(148,163,184,0.2);border-radius:var(--radius-sm);font-size:13px;font-weight:600;background:#fff">
+        <option value="">🌐 全部平台</option>
+        <option value="weibo">微博</option><option value="zhihu">知乎</option>
+        <option value="douyin">抖音</option><option value="bilibili">B站</option>
+        <option value="baidu">百度</option>
+      </select>
+      <input type="number" id="hotMinScore" placeholder="最低热度分" value="0" style="width:120px;padding:8px 14px;border:1.5px solid rgba(148,163,184,0.2);border-radius:var(--radius-sm);font-size:13px">
+      <div style="flex:1"></div>
+      <div class="tag-cloud">
+        <span class="tag-pill" onclick="fetchHotList()">📡 抓取热榜</span>
+        <span class="tag-pill" style="border-color:rgba(16,185,129,0.2);color:#059669" onclick="autoGenerateTopics()">⚡ 自动选题</span>
+        <span class="tag-pill" onclick="loadHotTopics()">🔄 刷新</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="hotTopicsList" class="card-list" style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:14px"></div>
+  <div id="hotTopicsEmpty" class="empty-state" style="display:none">
+    <span class="es-icon">📡</span>
+    <div class="es-title">暂无热点数据</div>
+    <div class="es-desc">点击"抓取热榜"获取最新热点话题</div>
+    <button class="btn btn-primary" onclick="fetchHotList()">📡 立即抓取</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- 📈 私域承接与转化 v1.2 -->
+<!-- ════════════════════════════════════════ -->
+<div id="tab-followup" style="display:none">
+  <div class="section-header">
+    <h2>📈 私域转化闭环</h2>
+    <span class="sub-desc">从线索到成交的全生命周期管理</span>
+  </div>
+  <div class="toolbar" style="background:rgba(255,255,255,0.9);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:14px;border:1px solid rgba(148,163,184,0.12)">
+    <select id="fuStageF" onchange="loadFollowUpLeads()">
+      <option value="">全部阶段</option>
+      <option value="new">新线索</option>
+      <option value="contacted">已触达</option>
+      <option value="qualified">已合格</option>
+      <option value="quoted">已报价</option>
+      <option value="converted">已成交</option>
+      <option value="lost">已流失</option>
+    </select>
+    <div style="flex:1"></div>
+    <button class="btn btn-outline" onclick="loadFollowUpLeads()">🔄 刷新</button>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:16px 0" id="fuStats"></div>
+  <div id="followUpLeadsList" class="card-list"></div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- ✨ 内容优化引擎 v1.2 -->
+<!-- ════════════════════════════════════════ -->
+<div id="tab-optimization" style="display:none">
+  <div class="section-header">
+    <h2>✨ 智能内容优化</h2>
+    <span class="sub-desc">数据驱动的持续改进引擎</span>
+  </div>
+  <div id="optReport" style="margin-bottom:20px"></div>
+  <div class="toolbar" style="background:rgba(255,255,255,0.9);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:14px;border:1px solid rgba(148,163,184,0.12)">
+    <div style="flex:1"></div>
+    <button class="btn btn-outline" onclick="loadOptimizationReport()">🔄 刷新报告</button>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:16px">
+    <div class="card" style="padding:16px">
+      <h3 style="margin:0 0 12px">📊 内容表现 Top 5</h3>
+      <div id="optTopContents"></div>
+    </div>
+    <div class="card" style="padding:16px">
+      <h3 style="margin:0 0 12px">💡 优化建议</h3>
+      <div id="optSuggestions"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- 🔍 竞争情报 v1.2 -->
+<!-- ════════════════════════════════════════ -->
+<div id="tab-competitor" style="display:none">
+  <div class="section-header">
+    <h2>🔍 竞争情报洞察</h2>
+    <span class="sub-desc">对标竞品动态，寻找增长突破口</span>
+  </div>
+  <div class="toolbar" style="background:rgba(255,255,255,0.9);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:14px;border:1px solid rgba(148,163,184,0.12)">
+    <div style="flex:1"></div>
+    <button class="btn btn-primary" onclick="showAddCompetitorModal()">+ 添加竞品</button>
+    <button class="btn btn-outline" onclick="fetchCompetitorContent()">📡 抓取内容</button>
+    <button class="btn btn-green" onclick="generateWeeklyReport()">📋 生成周报</button>
+    <button class="btn btn-outline" onclick="loadCompetitorPage()">🔄 刷新</button>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:16px 0" id="compStats"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+    <div>
+      <h3>🏢 竞品账号</h3>
+      <div id="competitorList" class="card-list"></div>
+    </div>
+    <div>
+      <h3>🎯 借势机会</h3>
+      <div id="gapAnalysisList" class="card-list"></div>
+    </div>
+  </div>
+</div>
+
 </div><!-- /.main-content -->
 </div><!-- /.container -->
 
@@ -2132,6 +2760,10 @@ a:hover { text-decoration:underline; }
 const API = '/api';
 const PAPI = '/api/platforms';
 const AUTH_API = '/api/auth';
+const HOT_API = '/api/hot-topics';
+const FU_API = '/api/follow-ups';
+const OPT_API = '/api/optimization';
+const COMP_API = '/api/competitor';
 
 let authToken = localStorage.getItem('auth_token');
 let currentUser = null;
@@ -2427,7 +3059,7 @@ function switchTabSidebar(tab, el) {
   currentTab = tab;
   document.querySelectorAll('.sidebar-item').forEach(function(t){ t.classList.remove('active'); });
   if (el) el.classList.add('active');
-  ['leads','accounts','tasks','templates','topics','knowledge','dashboard','inbox','publish','data','review','video','team'].forEach(function(t){
+  ['leads','accounts','tasks','templates','topics','knowledge','dashboard','inbox','publish','data','review','video','team','hottopics','followup','optimization','competitor'].forEach(function(t){
     var div = document.getElementById('tab-'+t);
     if (div) div.style.display = t===tab ? 'block' : 'none';
   });
@@ -2439,11 +3071,15 @@ function switchTabSidebar(tab, el) {
   else if(tab==='topics') loadTopics();
   else if(tab==='knowledge') loadKnowledge();
   else if(tab==='inbox') { loadInbox(); loadInboxStats(); }
-  else if(tab==='publish') { loadPublishAccounts(); }
+  else if(tab==='publish') { loadPublishAccounts(); loadHotTopicChips(); updateWorkflowStep(1); }
   else if(tab==='data') { initDataModule(); }
   else if(tab==='review') { loadReviewStats(); loadReviewQueue(); }
   else if(tab==='video') { loadVideoPlatforms(); loadVideoAccounts(); }
   else if(tab==='team') { loadTeamPage(); }
+  else if(tab==='hottopics') { loadHotTopics(); }
+  else if(tab==='followup') { loadFollowUpLeads(); }
+  else if(tab==='optimization') { loadOptimizationReport(); }
+  else if(tab==='competitor') { loadCompetitorPage(); }
 }
 
 // ════════════════════════════════════════
@@ -2851,7 +3487,6 @@ function openPublishForAccount(id, name, platform){
   _publishCandidates = [];
   // 重置编辑器状态
   document.getElementById('publishTopic').value = '';
-  document.getElementById('publishStyleHint').value = '';
   document.getElementById('publishCandidates').style.display = 'none';
   document.getElementById('publishResult').style.display = 'none';
   document.getElementById('publishPreviewArea').style.display = 'none';
@@ -2869,20 +3504,36 @@ async function doPublishGenerate(){
   _publishAccountId = accId;
 
   var topic = document.getElementById('publishTopic').value.trim();
-  var styleHint = document.getElementById('publishStyleHint').value.trim();
+  var style = document.getElementById('publishStyle')?.value || 'auto';
+  var length = document.getElementById('publishLength')?.value || 'auto';
+  var audience = document.getElementById('publishAudience')?.value || 'general';
+  var keywords = document.getElementById('publishKeywords')?.value || '';
+  var strategy = document.getElementById('publishStrategy')?.value || 'adaptive';
+  var cta = document.getElementById('publishCTA')?.value || 'auto';
+  var contentType = document.getElementById('publishContentType')?.value || 'article';
 
-  var btn = event && event.target;
+  var btn = document.querySelector('.publish-main-v2 .btn.btn-lg') || document.querySelector('#tab-publish .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'AI 生成中...'; }
+
+  updateWorkflowStep(2);
 
   try {
     var res = await apiFetch(PAPI+'/accounts/'+accId+'/publish/generate', {method:'POST', body:JSON.stringify({
-      topic: topic, style_hint: styleHint
+      topic: topic,
+      style_hint: style,
+      content_type: contentType,
+      length: length,
+      audience: audience,
+      keywords: keywords,
+      strategy: strategy,
+      cta: cta
     })});
     _publishCandidates = res.candidates || [];
     renderPublishCandidates(_publishCandidates);
+    updateWorkflowStep(3);
     toast('AI 已生成 '+_publishCandidates.length+' 个候选版本，点击选中或输入自定义内容', 'success');
   } catch(e) { toast('生成失败: '+(e.message||'请检查API配置'), 'error'); }
-  if (btn) { btn.disabled = false; btn.textContent = '🤖 AI生成内容'; }
+  if (btn) { btn.disabled = false; btn.textContent = '🤖 AI 生成内容'; }
 }
 
 function renderPublishCandidates(candidates){
@@ -2897,10 +3548,13 @@ function renderPublishCandidates(candidates){
   }
 
   list.innerHTML = candidates.map(function(c, i){
-    return '<div class="publish-candidate" onclick="selectPublishCandidate('+i+')" style="padding:10px 14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all .2s;font-size:13px;line-height:1.6;background:#fff" onmouseenter="this.style.borderColor=\'#93C5FD\';this.style.background=\'#F8FAFC\'" onmouseleave="this.style.borderColor=\'var(--border)\';this.style.background=\'#fff\'">'+
-      '<span style="color:var(--text2);font-size:11px;margin-right:8px">候选 '+(i+1)+'</span>'+
-      '<span style="color:var(--primary);font-size:11px;display:none" class="candidate-selected-mark">✓ 已选中</span>'+
-      esc(c)+
+    var preview = (c||'').substring(0, 120).replace(/\n/g,' ');
+    return '<div class="publish-candidate" onclick="selectPublishCandidate('+i+')" style="padding:14px 16px;border:1.5px solid rgba(148,163,184,0.18);border-radius:var(--radius-sm);cursor:pointer;transition:all .2s;font-size:13px;line-height:1.7;background:#fff;position:relative" onmouseenter="this.style.borderColor=\'rgba(99,102,241,0.4)\';this.style.background=\'#FAFAFE\';this.style.boxShadow=\'0 4px 12px rgba(99,102,241,0.08)\'' onmouseleave="if(!this.classList.contains(\'selected\')){this.style.borderColor=\'rgba(148,163,184,0.18)\';this.style.background=\'#fff\';this.style.boxShadow=\'none\'}">'+
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'+
+        '<span style="background:linear-gradient(135deg,#6366F1,#8B5CF6);color:#fff;font-size:10px;font-weight:700;padding:2px 10px;border-radius:10px">候选'+(i+1)+'</span>'+
+        '<span style="color:var(--primary);font-size:11px;font-weight:600;display:none" class="candidate-selected-mark">✅ 已选中</span>'+
+      '</div>'+
+      '<div style="color:var(--text);">'+esc(preview)+(preview.length>=120?'...':'')+'</div>'+
     '</div>';
   }).join('');
 }
@@ -2923,13 +3577,19 @@ function selectPublishCandidate(idx){
     var cards = document.querySelectorAll('.publish-candidate');
     cards.forEach(function(card, i){
       if (i === idx) {
-        card.style.borderColor = '#3B82F6';
-        card.style.background = '#EFF6FF';
-        card.querySelector('.candidate-selected-mark').style.display = 'inline';
+        card.classList.add('selected');
+        card.style.borderColor = 'rgba(99,102,241,0.5)';
+        card.style.background = '#EEF2FF';
+        card.style.boxShadow = '0 4px 16px rgba(99,102,241,0.12)';
+        var m = card.querySelector('.candidate-selected-mark');
+        if(m) m.style.display = 'inline';
       } else {
-        card.style.borderColor = 'var(--border)';
+        card.classList.remove('selected');
+        card.style.borderColor = 'rgba(148,163,184,0.18)';
         card.style.background = '#fff';
-        card.querySelector('.candidate-selected-mark').style.display = 'none';
+        card.style.boxShadow = 'none';
+        var m2 = card.querySelector('.candidate-selected-mark');
+        if(m2) m2.style.display = 'none';
       }
     });
   }
@@ -3095,19 +3755,18 @@ async function loadPublishAccounts(){
 
     list.innerHTML = accounts.map(function(a){
       var isActive = a.id === _publishAccountId;
-      var platformName = PLATFORM_NAMES[a.platform] || a.platform || '';
       var platformIcon = PLATFORM_ICONS[a.platform] || '';
-      var statusClass = a.status === 'active' ? 'pub-status-active' : 'pub-status-other';
-      var statusText = ACC_STATUS[a.status] || a.status || '-';
-      return '<div class="publish-account-card '+(isActive?'active':'')+'" onclick="selectPublishAccount('+a.id+', \''+esc(a.account_name)+'\', \''+esc(a.platform)+'\')">'+
-        '<div class="pac-platform">'+platformIcon+' '+platformName+'</div>'+
-        '<div class="pac-name">'+esc(a.account_name)+'</div>'+
-        '<div class="pac-meta">'+
-          '<span class="'+statusClass+'">'+statusText+'</span>'+
-          '<span>发布 '+((a.daily_publish_limit||0)-(a.today_publish_count||0))+'/'+(a.daily_publish_limit||0)+'</span>'+
-          '<span>评论 '+((a.daily_comment_quota||0)-(a.today_comment_count||0))+'/'+(a.daily_comment_quota||0)+'</span>'+
+      var statusOnline = a.status === 'active';
+      var initial = (a.account_name||'?').charAt(0).toUpperCase();
+      var remainPub = (a.daily_publish_limit||0)-(a.today_publish_count||0);
+      var remainCom = (a.daily_comment_quota||0)-(a.today_comment_count||0);
+      return '<div class="account-list-item '+(isActive?'active':'')+'" onclick="selectPublishAccount('+a.id+', \''+esc(a.account_name)+'\', \''+esc(a.platform)+'\')">'+
+        '<div class="ali-avatar">'+initial+'</div>'+
+        '<div class="ali-info">'+
+          '<div class="ali-name">'+esc(a.account_name)+'</div>'+
+          '<div class="ali-platform">'+platformIcon+' '+(PLATFORM_NAMES[a.platform]||a.platform||'')+' · 剩余 '+remainPub+' 发布 / '+remainCom+' 评论</div>'+
         '</div>'+
-        (a.persona ? '<div class="pac-meta" style="margin-top:2px">人设: '+esc(a.persona)+'</div>' : '')+
+        '<div class="ali-status '+(statusOnline?'online':'offline')+'"></div>'+
       '</div>';
     }).join('');
 
@@ -3120,10 +3779,10 @@ function selectPublishAccount(id, name, platform){
   _publishAccountId = id;
   _publishCandidates = [];
   // 更新 UI 选中状态
-  document.querySelectorAll('.publish-account-card').forEach(function(c){ c.classList.remove('active'); });
-  var cards = document.querySelectorAll('.publish-account-card');
+  document.querySelectorAll('.account-list-item').forEach(function(c){ c.classList.remove('active'); });
+  var cards = document.querySelectorAll('.account-list-item');
   if (event && event.target) {
-    var target = event.target.closest('.publish-account-card');
+    var target = event.target.closest('.account-list-item');
     if (target) target.classList.add('active');
   }
   // 重置编辑器并显示提示
@@ -3132,10 +3791,9 @@ function selectPublishAccount(id, name, platform){
   document.getElementById('publishPreviewArea').style.display = 'none';
   document.getElementById('publishPreviewToggle').classList.remove('active');
   document.getElementById('publishTopic').value = '';
-  document.getElementById('publishStyleHint').value = '';
   initPublishEditor(function(){
     if (_publishEditor) {
-      _publishEditor.root.innerHTML = '<p style="color:var(--text2);font-size:14px">当前账号: <strong style="color:var(--text)">'+esc(name)+'</strong> · 输入主题后点击 🤖 AI生成 获取推荐内容</p>';
+      _publishEditor.root.innerHTML = '<p style="color:var(--text2);text-align:center;padding:40px 20px;font-size:14px">📍 当前账号：<strong style="color:var(--text)">'+esc(name)+'</strong><br><span style="font-size:12px;color:var(--text-light);margin-top:6px;display:inline-block">输入创作主题 → 点击 🤖 AI 生成内容</span></p>';
     }
   });
   toast('已选择: ' + name + ' · 输入主题即可AI生成', 'info');
@@ -3293,6 +3951,15 @@ function renderKanban(leads){
 // ════════════════════════════════════════
 
 async function loadDashboardData(){
+  // ── 时间欢迎语 ──
+  var h = new Date().getHours();
+  var greet = h<6?'夜深了，注意休息 🌙':h<9?'早上好 ☀️':h<12?'上午好 🌤':h<14?'中午好 🌞':h<18?'下午好 🌈':'晚上好 🌙';
+  var greetsub = h<6?'明天又是增长的一天':h<9?'新的一天，新的增长机会':h<18?'今天又是增长的一天':'回顾今日的获客成果吧';
+  var greetEl = document.getElementById('greetingText');
+  var subEl = document.getElementById('greetingSub');
+  if(greetEl) greetEl.textContent = greet;
+  if(subEl) subEl.textContent = greetsub;
+
   // ── 右侧面板：用户信息 ──
   if (currentUser) {
     document.getElementById('sideAvatar').textContent = (currentUser.display_name || currentUser.username || 'U').charAt(0).toUpperCase();
@@ -3308,6 +3975,17 @@ async function loadDashboardData(){
       apiFetch(PAPI+'/stats').catch(function(){ return null; })
     ]);
 
+    // ── KPI 网格 ──
+    setKPICard('kpiAccounts', pr ? pr.active_accounts||0 : '--');
+    setKPICard('kpiPublished', pr ? (pr.daily_ops ? pr.daily_ops.publishes||0 : 0) : '--');
+    setKPICard('kpiLeads', lr ? lr.total_leads||0 : '--');
+    setKPICard('kpiInbox', lr ? lr.total_leads||0 : '--');
+
+    // ── 今日概览 ──
+    setEle('ssLeads', lr ? lr.total_leads||0 : '--');
+    setEle('ssPublished', pr ? (pr.daily_ops ? pr.daily_ops.publishes||0 : 0) : '--');
+    setEle('ssMessages', lr ? lr.total_leads||0 : '--');
+
     // ── 核心指标卡片 ──
     var cards = document.getElementById('dashboardCards');
     if (cards) {
@@ -3316,6 +3994,29 @@ async function loadDashboardData(){
         '<div class="stat-card"><div class="label">平台账号</div><div class="value" style="color:var(--green)">'+(pr ? pr.active_accounts||0 : 0)+'</div><div class="sub">共 '+(pr ? pr.total_accounts||0 : 0)+' 个账号</div></div>'+
         '<div class="stat-card"><div class="label">今日发布/评论</div><div class="value" style="color:var(--primary)">'+(pr ? (pr.daily_ops ? pr.daily_ops.publishes||0 : 0) : 0)+' / '+(pr ? (pr.daily_ops ? pr.daily_ops.comments||0 : 0) : 0)+'</div><div class="sub">任务总数 '+(pr ? pr.total_tasks||0 : 0)+'</div></div>'+
         '<div class="stat-card"><div class="label">素材库</div><div class="value">'+(lr ? (lr.content_stats ? lr.content_stats.total||0 : 0) : 0)+'</div><div class="sub">AI生成 '+(lr ? (lr.content_stats ? lr.content_stats.ai_generated||0 : 0) : 0)+'</div></div>';
+    }
+
+    // ── 最近动态 ──
+    var recActivity = document.getElementById('recentActivity');
+    if (recActivity) {
+      var now = new Date();
+      var timeStr = now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
+      recActivity.innerHTML = 
+        '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid rgba(148,163,184,0.08)">'+
+          '<span style="font-size:20px">📊</span>'+
+          '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--text)">系统仪表盘已就绪</div><div style="font-size:11px;color:var(--text2)">'+timeStr+' · 欢迎使用 AI 获客系统 v1.1</div></div>'+
+          '<span class="tag-pill" style="font-size:10px;padding:2px 10px;background:rgba(16,185,129,0.1);color:#059669;border-color:rgba(16,185,129,0.15)">运行中</span>'+
+        '</div>'+
+        (pr ? 
+        '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid rgba(148,163,184,0.08)">'+
+          '<span style="font-size:20px">📱</span>'+
+          '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--text)">'+(pr.active_accounts||0)+' 个活跃账号在线</div><div style="font-size:11px;color:var(--text2)">共 '+(pr.total_accounts||0)+' 个已授权账号</div></div>'+
+        '</div>' : '')+
+        '<div style="display:flex;align-items:center;gap:12px;padding:8px 0">'+
+          '<span style="font-size:20px">💡</span>'+
+          '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--text)">尝试 AI 内容创作</div><div style="font-size:11px;color:var(--text2)">使用热点选题引擎快速生成爆款内容</div></div>'+
+          '<span onclick="switchTabSidebar(\'publish\')" style="font-size:12px;color:var(--primary);cursor:pointer;font-weight:600">前往 →</span>'+
+        '</div>';
     }
 
     // ── 大卡片：发布统计 ──
@@ -3361,6 +4062,10 @@ async function loadDashboardData(){
     setQuota('quotaAI', totalTasks, 500);
   } catch(e) { console.error('dashboard error:', e); }
 }
+
+// ── 工具函数 ──
+function setKPICard(id, val) { var el = document.getElementById(id); if(el) el.textContent = val; }
+function setEle(id, val) { var el = document.getElementById(id); if(el) el.textContent = val; }
 
 // ════════════════════════════════════════
 // 知识库管理 (PRD 4.3)
@@ -4659,11 +5364,14 @@ async function loadReviewStats(){
     var params = _dataDateRangeParams();
     var res = await apiFetch(PAPI+'/analytics/dashboard'+_buildQuery(params));
     var s = res.summary || {};
-    document.getElementById('reviewPendingCount').textContent = fmtNum(s.pending_review || 0);
-    document.getElementById('reviewApprovedCount').textContent = fmtNum(s.completed_tasks || 0);
-    document.getElementById('reviewRejectedCount').textContent = '-';
+    var pendingCnt = s.pending_review || 0;
+    var approvedCnt = s.completed_tasks || 0;
+    setEle('reviewPendingCountValue', fmtNum(pendingCnt));
+    setEle('reviewApprovedCountValue', fmtNum(approvedCnt));
+    setEle('reviewRejectedCountValue', '-');
+    setEle('reviewTodayCount', fmtNum(pendingCnt+approvedCnt));
     var badge = document.getElementById('reviewBadge');
-    if (badge) { badge.textContent = s.pending_review || 0; badge.style.display = (s.pending_review||0)>0 ? 'inline-flex' : 'none'; }
+    if (badge) { badge.textContent = pendingCnt; badge.style.display = pendingCnt>0 ? 'inline-flex' : 'none'; }
   } catch(e){ console.error('review stats', e); }
 }
 
@@ -5032,6 +5740,358 @@ checkAutoLogin().then(function(ok) {
     document.getElementById('loginPage').style.display = 'flex';
   }
 });
+
+// ════════════════════════════════════════
+// 🔥 热点选题引擎 v1.2
+// ════════════════════════════════════════
+
+async function loadHotTopics() {
+  try {
+    const platform = document.getElementById('hotPlatformF')?.value || '';
+    const minScore = document.getElementById('hotMinScore')?.value || 0;
+    const url = HOT_API+'/list?limit=50&min_score='+minScore+(platform?('&platform='+platform):'');
+    const r = await apiFetch(url);
+    const list = document.getElementById('hotTopicsList');
+    const emptyEl = document.getElementById('hotTopicsEmpty');
+    const topics = r.topics || [];
+
+    // KPI 更新
+    setKPICard('hotTotalCount', topics.length);
+    var highScore = topics.filter(function(t){ return t.final_score >= 70; }).length;
+    var avgScore = topics.length > 0 ? Math.round(topics.reduce(function(s,t){ return s+(t.final_score||0); }, 0) / topics.length) : '--';
+    setKPICard('hotHighScore', highScore);
+    setKPICard('hotAvgScore', avgScore);
+    setKPICard('hotNewToday', '--');
+    var badgeEl = document.getElementById('hotCountBadge');
+    if(badgeEl) badgeEl.textContent = topics.length + ' 条';
+
+    if (!topics || topics.length === 0) {
+      if(list) list.innerHTML = '';
+      if(emptyEl) emptyEl.style.display = 'block';
+      return;
+    }
+    if(emptyEl) emptyEl.style.display = 'none';
+
+    list.innerHTML = topics.map(function(t, i) {
+      var scoreColor = t.final_score >= 70 ? '#059669' : t.final_score >= 50 ? '#D97706' : '#64748B';
+      var rankEmoji = i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1);
+      var platformTag = (t.source_platform||'').toLowerCase();
+      var tagClass = '';
+      if(t.final_score>=70) tagClass='hot';
+      return '<div class="trend-card" onclick="useHotTopicDirect(\''+escapeHtml(t.title||'')+'\')">'+
+        '<div class="tc-rank">'+rankEmoji+'</div>'+
+        '<div class="tc-platform">'+(t.source_platform||'未知')+' · 热搜</div>'+
+        '<div class="tc-title">'+escapeHtml(t.title||'无标题')+'</div>'+
+        '<div class="tc-meta">'+
+          '<span>🔥 '+(t.hot_score||0)+' 热度</span>'+
+          '<span>🎯 '+(t.relevance_score||0)+' 相关</span>'+
+          '<span>📈 '+(t.potential_score||0)+' 潜力</span>'+
+        '</div>'+
+        '<div class="tc-tags">'+
+          '<span class="tc-tag'+(tagClass?' '+tagClass:'')+'">综合分 '+(t.final_score||0)+'</span>'+
+          (t.final_score>=70?'<span class="tc-tag hot">🔥 爆款潜力</span>':'')+
+        '</div>'+
+        '<div style="display:flex;justify-content:space-between;margin-top:10px;align-items:center">'+
+          '<div style="width:100%;height:4px;background:rgba(148,163,184,0.12);border-radius:2px;overflow:hidden">'+
+            '<div style="width:'+Math.min((t.final_score||0),100)+'%;height:100%;border-radius:2px;background:linear-gradient(90deg,'+scoreColor+',rgba(99,102,241,0.7))"></div>'+
+          '</div>'+
+          '<span style="font-size:11px;font-weight:600;color:'+scoreColor+';margin-left:10px;white-space:nowrap">'+(t.final_score||0)+'分</span>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+
+    // 也更新发布页的热点标签
+    loadHotTopicChips();
+  } catch(e) { console.error('loadHotTopics', e); }
+}
+
+async function fetchHotList() {
+  try {
+    const platforms = ['weibo','zhihu','douyin','bilibili','baidu'];
+    alert('开始抓取热榜，请稍候...');
+    const r = await apiFetch(HOT_API+'/fetch', {
+      method: 'POST',
+      body: JSON.stringify({ platforms: platforms })
+    });
+    let msg = '抓取结果:\n';
+    (r.results||[]).forEach(function(it) {
+      msg += (it.platform||'')+': 抓取 '+(it.fetched||0)+' 条, 新增 '+(it.new_count||0)+' 条\n';
+    });
+    alert(msg);
+    loadHotTopics();
+  } catch(e) { alert('抓取失败: '+e.message); }
+}
+
+async function autoGenerateTopics() {
+  try {
+    const r = await apiFetch(HOT_API+'/auto-generate', {
+      method: 'POST',
+      body: JSON.stringify({ min_score: 50, max_count: 10 })
+    });
+    alert('已生成 '+(r.generated_count||0)+' 个选题草稿');
+  } catch(e) { alert('生成失败: '+e.message); }
+}
+
+// ── 新功能：内容类型选择 ──
+function setContentType(type, el) {
+  document.querySelectorAll('.content-type-btn').forEach(function(b){ b.classList.remove('active'); });
+  if(el) el.classList.add('active');
+  document.getElementById('publishContentType').value = type;
+}
+
+// ── 新功能：高级选项折叠 ──
+function toggleAdvancedOptions() {
+  var body = document.getElementById('paBody');
+  var arrow = document.getElementById('paArrow');
+  if(body.style.display === 'none') {
+    body.style.display = 'grid';
+    if(arrow) arrow.textContent = '▾';
+  } else {
+    body.style.display = 'none';
+    if(arrow) arrow.textContent = '▸';
+  }
+}
+
+// ── 新功能：发布页加载热点标签 ──
+async function loadHotTopicChips() {
+  try {
+    var r = await apiFetch(HOT_API+'/list?limit=8&min_score=50');
+    var topics = r.topics || [];
+    var chipsEl = document.getElementById('hotTopicChips');
+    if(!chipsEl) return;
+    if(topics.length === 0) {
+      chipsEl.innerHTML = '<span class="hot-topic-chip" onclick="fetchHotList()">📡 点击抓取热点</span>';
+      return;
+    }
+    chipsEl.innerHTML = topics.map(function(t) {
+      return '<span class="hot-topic-chip" onclick="useHotTopic(\''+escapeHtml(t.title||'')+'\')" title="热度:'+(t.final_score||0)+'">🔥 '+escapeHtml((t.title||'').substring(0,15)+((t.title||'').length>15?'...':''))+' <span class="ht-score">'+(t.final_score||0)+'</span></span>';
+    }).join('');
+  } catch(e) { /* silent */ }
+}
+
+// ── 新功能：使用热点话题 ──
+function useHotTopic(el) {
+  var topic = el.textContent.replace(/🔥\s*/, '').replace(/\s+\d+$/, '');
+  var input = document.getElementById('publishTopic');
+  if(input) { input.value = topic.trim(); input.focus(); }
+  updateWorkflowStep(2);
+}
+
+function useHotTopicDirect(title) {
+  var input = document.getElementById('publishTopic');
+  if(input) { input.value = title; input.focus(); }
+  switchTabSidebar('publish');
+  updateWorkflowStep(2);
+}
+
+// ── 新功能：工作流步骤更新 ──
+function updateWorkflowStep(step) {
+  for(var i=1;i<=4;i++) {
+    var el = document.getElementById('wfStep'+i);
+    if(!el) continue;
+    el.classList.remove('active','complete');
+    if(i<step) el.classList.add('complete');
+    else if(i===step) el.classList.add('active');
+  }
+}
+
+// ── 新功能：HTML转义 ──
+function escapeHtml(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+// ════════════════════════════════════════
+// 📈 私域承接与转化 v1.2
+// ════════════════════════════════════════
+
+async function loadFollowUpLeads() {
+  try {
+    const stage = document.getElementById('fuStageF')?.value || '';
+    const url = API+'/leads?limit=50'+(stage?('&status='+stage):'');
+    const r = await apiFetch(url);
+    const list = document.getElementById('followUpLeadsList');
+    const leads = r.leads || r.items || r.data || [];
+    if (!leads || leads.length === 0) {
+      list.innerHTML = '<div class="empty-state">暂无线索</div>';
+    } else {
+      list.innerHTML = leads.map(function(l) {
+        const stageLabels = {new:'新线索',contacted:'已触达',qualified:'已合格',quoted:'已报价',converted:'已成交',lost:'已流失'};
+        const stageColors = {new:'#999',contacted:'var(--primary)',qualified:'var(--yellow)',quoted:'#9b59b6',converted:'var(--green)',lost:'#e74c3c'};
+        const stage = l.journey_stage || l.status || 'new';
+        return '<div class="card" style="padding:14px;margin-bottom:8px">'+
+          '<div style="display:flex;justify-content:space-between;align-items:center">'+
+            '<div>'+
+              '<div style="font-weight:600">'+(l.name||'')+' <span style="font-size:12px;color:var(--text2)">'+(l.company||'')+'</span></div>'+
+              '<div style="font-size:12px;color:var(--text2);margin-top:4px">'+
+                'AI评分: '+(l.ai_score||0)+' · 联系次数: '+(l.contact_count||0)+
+              '</div>'+
+            '</div>'+
+            '<div style="text-align:right">'+
+              '<span class="tag" style="background:'+(stageColors[stage]||'#999')+';color:#fff">'+(stageLabels[stage]||stage)+'</span>'+
+            '</div>'+
+          '</div>'+
+        '</div>';
+      }).join('');
+    }
+    // 统计卡片 - 使用 KPI 风格
+    const stats = document.getElementById('fuStats');
+    const stages = ['new','contacted','qualified','quoted','converted','lost'];
+    const stageLabels = {new:'新线索',contacted:'已触达',qualified:'已合格',quoted:'已报价',converted:'已成交',lost:'已流失'};
+    const stageIcons = {new:'🆕',contacted:'📞',qualified:'✅',quoted:'💰',converted:'🏆',lost:'❌'};
+    const stageColors = {new:'#64748B',contacted:'#6366F1',qualified:'#D97706',quoted:'#8B5CF6',converted:'#059669',lost:'#DC2626'};
+    const stageLightColors = {new:'rgba(100,116,139,0.08)',contacted:'rgba(99,102,241,0.08)',qualified:'rgba(217,119,6,0.08)',quoted:'rgba(139,92,246,0.08)',converted:'rgba(16,185,129,0.08)',lost:'rgba(220,38,38,0.08)'};
+    stats.innerHTML = stages.map(function(s) {
+      const count = leads.filter(function(l) { return (l.journey_stage||l.status) === s; }).length;
+      return '<div class="kpi-card" style="cursor:pointer" onclick="document.getElementById(\'fuStageF\').value=\''+s+'\';loadFollowUpLeads()">'+
+        '<span class="kpi-icon">'+(stageIcons[s]||'')+'</span>'+
+        '<div class="kpi-value" style="color:'+(stageColors[s]||'#999')+'">'+count+'</div>'+
+        '<div class="kpi-label">'+stageLabels[s]+'</div>'+
+      '</div>';
+    }).join('');
+  } catch(e) { console.error('loadFollowUpLeads', e); }
+}
+
+// ════════════════════════════════════════
+// ✨ 内容优化引擎 v1.2
+// ════════════════════════════════════════
+
+async function loadOptimizationReport() {
+  try {
+    const r = await apiFetch(OPT_API+'/report');
+    const reportDiv = document.getElementById('optReport');
+    if (r.total_contents === 0) {
+      reportDiv.innerHTML = '<div class="empty-state">暂无内容数据，发布内容后可查看优化报告</div>';
+      document.getElementById('optTopContents').innerHTML = '';
+      document.getElementById('optSuggestions').innerHTML = '';
+      return;
+    }
+    reportDiv.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">'+
+      '<div class="stat-card"><div class="label">总内容数</div><div class="value">'+(r.total_contents||0)+'</div></div>'+
+      '<div class="stat-card"><div class="label">平均浏览</div><div class="value">'+(r.avg_views||0)+'</div></div>'+
+      '<div class="stat-card"><div class="label">平均互动率</div><div class="value">'+(r.avg_engagement_rate||0)+'%</div></div>'+
+      '<div class="stat-card"><div class="label">爆款数</div><div class="value" style="color:var(--green)">'+(r.viral_count||0)+'</div></div>'+
+      '<div class="stat-card"><div class="label">低表现</div><div class="value" style="color:var(--yellow)">'+(r.low_performing_count||0)+'</div></div>'+
+    '</div>';
+
+    const topDiv = document.getElementById('optTopContents');
+    if (r.top_contents && r.top_contents.length > 0) {
+      topDiv.innerHTML = r.top_contents.map(function(c) {
+        return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
+          '<div style="font-size:13px;font-weight:500">'+(c.title||'无标题')+'</div>'+
+          '<div style="font-size:11px;color:var(--text2)">浏览 '+(c.views||0)+' · 点赞 '+(c.likes||0)+'</div>'+
+        '</div>';
+      }).join('');
+    } else { topDiv.innerHTML = '<div class="empty-state">暂无数据</div>'; }
+
+    const sugDiv = document.getElementById('optSuggestions');
+    if (r.suggestions && r.suggestions.length > 0) {
+      sugDiv.innerHTML = r.suggestions.map(function(s) {
+        return '<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">💡 '+s+'</div>';
+      }).join('');
+    } else { sugDiv.innerHTML = '<div class="empty-state">暂无建议</div>'; }
+  } catch(e) { console.error('loadOptimizationReport', e); }
+}
+
+// ════════════════════════════════════════
+// 🔍 竞争情报 v1.2
+// ════════════════════════════════════════
+
+async function loadCompetitorPage() {
+  try {
+    const [comps, gaps, roi] = await Promise.all([
+      apiFetch(COMP_API+'/accounts').catch(function(){ return {competitors:[]}; }),
+      apiFetch(COMP_API+'/gap-analysis').catch(function(){ return {opportunities:[]}; }),
+      apiFetch(COMP_API+'/channel-roi?period_days=30').catch(function(){ return {channels:[]}; })
+    ]);
+
+    // 竞品列表
+    const compList = document.getElementById('competitorList');
+    if (!comps.competitors || comps.competitors.length === 0) {
+      compList.innerHTML = '<div class="empty-state">暂无竞品，点击「添加竞品」</div>';
+    } else {
+      compList.innerHTML = comps.competitors.map(function(c) {
+        return '<div class="card" style="padding:12px;margin-bottom:8px">'+
+          '<div style="font-weight:600">'+(c.account_name||'')+'</div>'+
+          '<div style="font-size:12px;color:var(--text2);margin-top:4px">'+
+            '<span class="tag" style="background:var(--primary-light);color:#fff">'+(c.platform||'')+'</span> '+
+            '粉丝: '+(c.follower_count||0)+' · 互动率: '+(c.avg_engagement||0)+'%'+
+          '</div>'+
+        '</div>';
+      }).join('');
+    }
+
+    // 借势机会
+    const gapList = document.getElementById('gapAnalysisList');
+    if (!gaps.opportunities || gaps.opportunities.length === 0) {
+      gapList.innerHTML = '<div class="empty-state">暂无线索，点击「抓取内容」获取</div>';
+    } else {
+      gapList.innerHTML = gaps.opportunities.map(function(g) {
+        return '<div class="card" style="padding:12px;margin-bottom:8px">'+
+          '<div style="font-weight:600;font-size:13px">'+(g.competitor_content||'')+'</div>'+
+          '<div style="font-size:12px;color:var(--text2);margin-top:4px">'+
+            '<span class="tag" style="background:var(--green);color:#fff">机会分 '+(g.opportunity_score||0)+'</span> '+
+            (g.platform||'')+' · 互动率 '+((g.competitor_engagement_rate*100)||0).toFixed(1)+'%'+
+          '</div>'+
+          '<div style="font-size:12px;margin-top:6px;color:var(--text2)">'+(g.gap_analysis||'')+'</div>'+
+        '</div>';
+      }).join('');
+    }
+
+    // ROI 统计
+    const statsDiv = document.getElementById('compStats');
+    if (!roi.channels || roi.channels.length === 0) {
+      statsDiv.innerHTML = '<div class="empty-state">暂无 ROI 数据</div>';
+    } else {
+      statsDiv.innerHTML = roi.channels.map(function(c) {
+        return '<div class="stat-card"><div class="label">'+(c.channel||'')+'</div>'+
+          '<div class="value">'+(c.total_views||0)+'</div>'+
+          '<div class="sub">线索 '+(c.total_leads||0)+' · ROI '+(c.roi_score||0)+'</div></div>';
+      }).join('');
+    }
+  } catch(e) { console.error('loadCompetitorPage', e); }
+}
+
+async function showAddCompetitorModal() {
+  const platform = prompt('平台 (weibo/zhihu/douyin/bilibili):');
+  if (!platform) return;
+  const name = prompt('竞品账号名称:');
+  if (!name) return;
+  const url = prompt('账号主页 URL:') || '';
+  const industry = prompt('行业:') || '';
+  try {
+    await apiFetch(COMP_API+'/accounts', {
+      method: 'POST',
+      body: JSON.stringify({ platform: platform, account_name: name, account_url: url, industry: industry })
+    });
+    alert('添加成功');
+    loadCompetitorPage();
+  } catch(e) { alert('添加失败: '+e.message); }
+}
+
+async function fetchCompetitorContent() {
+  try {
+    alert('开始抓取竞品内容，请稍候...');
+    const r = await apiFetch(COMP_API+'/fetch-content', {
+      method: 'POST',
+      body: JSON.stringify({})
+    });
+    let msg = '抓取结果:\n';
+    (r.results||[]).forEach(function(it) {
+      msg += '竞品 #'+(it.competitor_id||'')+': 抓取 '+(it.fetched||0)+' 条\n';
+    });
+    alert(msg);
+    loadCompetitorPage();
+  } catch(e) { alert('抓取失败: '+e.message); }
+}
+
+async function generateWeeklyReport() {
+  try {
+    alert('正在生成周报...');
+    const r = await apiFetch(COMP_API+'/weekly-report', {
+      method: 'POST',
+      body: JSON.stringify({})
+    });
+    alert('周报已生成！\n\n摘要: '+(r.executive_summary||'').substring(0,200));
+  } catch(e) { alert('生成失败: '+e.message); }
+}
 </script>
 </body>
 </html>
