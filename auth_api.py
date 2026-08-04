@@ -1,10 +1,12 @@
 """认证 API — 注册、登录、团队管理、用户管理、权限控制"""
 import secrets
 import string
+import time
+from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -17,6 +19,33 @@ from services.auth_service import (
 from config import settings
 
 router = APIRouter(prefix="/api/auth", tags=["认证"])
+
+
+# ── 登录限流：内存计数器，按IP+用户名限流 ──
+_login_attempts: dict = defaultdict(list)
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_WINDOW_SECONDS = 300  # 5分钟
+
+
+def _check_login_rate(ip: str, username: str) -> None:
+    """检查登录频率，超过限制则抛出异常"""
+    now = time.time()
+    key = f"{ip}:{username}"
+    attempts = [t for t in _login_attempts[key] if now - t < LOGIN_WINDOW_SECONDS]
+    if len(attempts) >= LOGIN_MAX_ATTEMPTS:
+        raise HTTPException(429, "登录尝试过于频繁，请稍后再试")
+    attempts.append(now)
+    _login_attempts[key] = attempts
+
+
+def _validate_password_strength(password: str) -> None:
+    """验证密码强度：至少8位，包含字母和数字"""
+    if len(password) < 8:
+        raise HTTPException(400, "密码长度至少 8 位")
+    has_letter = any(c.isalpha() for c in password)
+    has_digit = any(c.isdigit() for c in password)
+    if not (has_letter and has_digit):
+        raise HTTPException(400, "密码需同时包含字母和数字")
 
 
 # ── Pydantic 模型 ──
@@ -68,6 +97,7 @@ def _user_info(user: User, team_name: str = "") -> dict:
         "role": user.role, "role_label": settings.ROLE_LABELS.get(user.role, user.role),
         "team_id": user.team_id, "team_name": team_name,
         "is_active": user.is_active,
+        "must_change_password": user.must_change_password or False,
         "created_at": user.created_at.isoformat() if user.created_at else None,
     }
 
@@ -79,8 +109,7 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     """用户注册（可带邀请码加入团队）"""
     if len(data.username) < 3 or len(data.username) > 50:
         raise HTTPException(400, "用户名长度需在 3-50 之间")
-    if len(data.password) < 4:
-        raise HTTPException(400, "密码长度至少 4 位")
+    _validate_password_strength(data.password)
 
     existing = db.query(User).filter(User.username == data.username).first()
     if existing:
@@ -138,14 +167,20 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
 # ── 登录 ──
 
 @router.post("/login")
-def login(data: LoginRequest, db: Session = Depends(get_db)):
-    """用户登录"""
+def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    """用户登录（含频率限制和强制改密检测）"""
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    _check_login_rate(client_ip, data.username)
+
     user = db.query(User).filter(User.username == data.username).first()
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(401, "用户名或密码错误")
 
     if not user.is_active:
         raise HTTPException(403, "账号已被禁用")
+
+    if user.must_change_password:
+        raise HTTPException(403, "首次登录请先修改初始密码")
 
     user.last_login_at = datetime.utcnow()
     db.commit()
@@ -542,10 +577,10 @@ def change_password(
     """修改自己的密码"""
     if not verify_password(req.old_password, current_user.password_hash):
         raise HTTPException(400, "原密码错误")
-    if len(req.new_password) < 4:
-        raise HTTPException(400, "新密码长度至少 4 位")
+    _validate_password_strength(req.new_password)
 
     current_user.password_hash = hash_password(req.new_password)
+    current_user.must_change_password = False
     db.commit()
     return {"message": "密码修改成功"}
 
@@ -566,10 +601,10 @@ def reset_password(
         raise HTTPException(404, "用户不存在")
     if not can_manage_user(current_user, target):
         raise HTTPException(403, "不能操作该用户")
-    if len(req.new_password) < 4:
-        raise HTTPException(400, "新密码长度至少 4 位")
+    _validate_password_strength(req.new_password)
 
     target.password_hash = hash_password(req.new_password)
+    target.must_change_password = False
     db.commit()
     return {"message": "密码已重置"}
 

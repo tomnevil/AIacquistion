@@ -10,7 +10,7 @@ scheduler = AsyncIOScheduler()
 
 
 async def execute_scheduled_task(task_id: int):
-    """执行定时发布任务"""
+    """执行定时发布任务 — 直接用已审核内容发布到目标账号"""
     db = SessionLocal()
     try:
         task = db.query(PlatformTask).filter(PlatformTask.id == task_id).first()
@@ -23,29 +23,16 @@ async def execute_scheduled_task(task_id: int):
         task.status = PlatformTaskStatus.RUNNING.value
         db.commit()
 
-        from platforms.browser_engine import browser_engine
         from services.platform_manager import platform_manager
 
-        await browser_engine.start()
+        # 直接执行发布，复用已审核的 final_content
+        result = await platform_manager.execute_publish(task_id, db)
 
-        account = db.query(PlatformTask).filter(
-            PlatformTask.id == task_id
-        ).first()  # re-fetch for safety
-        if not account:
-            return
-
-        results = await platform_manager.cross_platform_publish(
-            {"title": task.target_title, "content": task.final_content},
-            [task.account_id],
-            db,
-            user_id=task.user_id,
-        )
-
-        if results and results[0].get("success"):
+        if result.get("success"):
             task.status = PlatformTaskStatus.COMPLETED.value
         else:
             task.status = PlatformTaskStatus.FAILED.value
-            task.error_message = results[0].get("error", "发布失败") if results else "无结果"
+            task.error_message = result.get("error", "发布失败")
 
         task.executed_at = datetime.utcnow()
         db.commit()
@@ -66,10 +53,6 @@ async def execute_scheduled_task(task_id: int):
         except Exception:
             pass
     finally:
-        try:
-            await browser_engine.stop()
-        except Exception:
-            pass
         db.close()
 
 

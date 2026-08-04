@@ -44,20 +44,17 @@ class PlatformRisk:
 
 
 class RiskControl:
-    """风险控制管理器"""
+    """风险控制管理器 — 以 DB 为准，保证重启后配额不丢失"""
 
     def __init__(self):
-        # 操作计数: {account_id: {"comments": N, "publishes": N, "last_action": timestamp}}
-        # 每日重置，内存存储即可
-        self._daily_ops: dict[int, dict] = defaultdict(lambda: {
-            "comments": 0, "replies": 0, "publishes": 0,
+        # 内存缓存：加速操作间隔检查（last_action 时间戳）
+        # 但每日计数以 DB 中 PlatformAccount.daily_*_count 为准
+        self._action_timestamps: dict[int, dict] = defaultdict(lambda: {
             "last_action": 0, "last_action_platform": "",
         })
         # 内容指纹去重: {content_hash: [timestamp, timestamp, ...]}
-        # 持久化到数据库
         self._content_hashes: dict[str, list] = defaultdict(list)
         # 黑名单: 被封的账号ID集合
-        # 持久化到数据库
         self._blacklist: set = set()
         self._load_from_db()
 
@@ -75,11 +72,11 @@ class RiskControl:
         finally:
             db.close()
 
-    # ── 配额检查 ──
+    # ── 配额检查（DB 为准）──
 
     def check_quota(self, account: dict, action_type: str) -> tuple[bool, str]:
         """
-        检查操作配额
+        检查操作配额 — 从 DB 读取每日计数
         Returns: (is_allowed, reason)
         """
         account_id = account["id"]
@@ -89,36 +86,64 @@ class RiskControl:
         if account_id in self._blacklist:
             return False, "账号已被加入黑名单"
 
-        # 获取今日操作记录
-        ops = self._daily_ops[account_id]
-        limit_key = f"daily_{action_type}_limit"
-        count_key = f"{action_type}s"
+        # 从 DB 读取账号的当前计数
+        db = SessionLocal()
+        try:
+            from database import PlatformAccount as PA
+            acc = db.query(PA).filter(PA.id == account_id).first()
+            if not acc:
+                return False, "账号不存在"
 
-        limit = account.get(limit_key, 5)
-        count = ops.get(count_key, 0)
+            if action_type in ("comment", "reply"):
+                count = acc.daily_comment_count or 0
+                limit = account.get("daily_comment_limit", 20)
+            elif action_type == "publish":
+                count = acc.daily_publish_count or 0
+                limit = acc.daily_publish_limit or account.get("daily_publish_limit", 3)
+            else:
+                count = 0
+                limit = account.get(f"daily_{action_type}_limit", 5)
 
-        if count >= limit:
-            return False, f"今日{action_type}配额已用完({count}/{limit})"
+            if count >= limit:
+                return False, f"今日{action_type}配额已用完({count}/{limit})"
 
-        # 时间间隔检查
-        min_interval, max_interval = PlatformRisk.get_interval(platform)
-        elapsed = time.time() - ops["last_action"]
-        if ops["last_action"] > 0 and elapsed < min_interval:
-            wait = int(min_interval - elapsed)
-            return False, f"操作过快，需等待{wait}秒"
+            # 操作间隔检查
+            ts = self._action_timestamps[account_id]
+            min_interval, max_interval = PlatformRisk.get_interval(platform)
+            elapsed = time.time() - ts["last_action"]
+            if ts["last_action"] > 0 and elapsed < min_interval:
+                wait = int(min_interval - elapsed)
+                return False, f"操作过快，需等待{wait}秒"
 
-        return True, ""
+            return True, ""
+        finally:
+            db.close()
 
     def record_action(self, account: dict, action_type: str):
-        """记录一次操作"""
+        """记录一次操作 — 更新 DB 计数 + 内存时间戳"""
         account_id = account["id"]
         platform = account["platform"]
 
-        ops = self._daily_ops[account_id]
-        count_key = f"{action_type}s"
-        ops[count_key] = ops.get(count_key, 0) + 1
-        ops["last_action"] = time.time()
-        ops["last_action_platform"] = platform
+        # 更新内存时间戳（间隔检查用）
+        self._action_timestamps[account_id]["last_action"] = time.time()
+        self._action_timestamps[account_id]["last_action_platform"] = platform
+
+        # 更新 DB 计数
+        db = SessionLocal()
+        try:
+            from database import PlatformAccount as PA
+            acc = db.query(PA).filter(PA.id == account_id).first()
+            if acc:
+                if action_type in ("comment", "reply"):
+                    acc.daily_comment_count = (acc.daily_comment_count or 0) + 1
+                elif action_type == "publish":
+                    acc.daily_publish_count = (acc.daily_publish_count or 0) + 1
+                acc.last_action_at = datetime.utcnow()
+                db.commit()
+        except Exception:
+            db.rollback()
+        finally:
+            db.close()
 
     # ── 内容去重 ──
 
@@ -274,14 +299,28 @@ class RiskControl:
     # ── 配额重置（每天凌晨调用） ──
 
     def reset_daily(self):
-        """重置每日配额"""
-        self._daily_ops.clear()
+        """重置每日配额 — 同步清理 DB 中的计数"""
+        self._action_timestamps.clear()
         # 清理过期内容指纹 (保留最近24h)
         cutoff = datetime.now() - timedelta(hours=24)
         for h in list(self._content_hashes.keys()):
             self._content_hashes[h] = [t for t in self._content_hashes[h] if t > cutoff]
             if not self._content_hashes[h]:
                 del self._content_hashes[h]
+
+        # 同步清理 DB
+        db = SessionLocal()
+        try:
+            from database import PlatformAccount as PA
+            db.query(PA).update({
+                PA.daily_comment_count: 0,
+                PA.daily_publish_count: 0,
+            }, synchronize_session=False)
+            db.commit()
+        except Exception:
+            db.rollback()
+        finally:
+            db.close()
 
     def blacklist_account(self, account_id: int, reason: str = ""):
         """拉黑账号"""

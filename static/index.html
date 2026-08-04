@@ -2306,7 +2306,7 @@ function showApp() {
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('appMain').style.display = 'block';
   const roleBadge = currentUser.role === 'admin' ? ' <span style="background:#FBBF24;color:#000;font-size:11px;padding:2px 8px;border-radius:10px;margin-left:6px;">🔧 管理员</span>' : '';
-  document.getElementById('headerUser').innerHTML = '👤 ' + (currentUser.display_name || currentUser.username) + roleBadge;
+  document.getElementById('headerUser').innerHTML = '👤 ' + esc(currentUser.display_name || currentUser.username) + roleBadge;
   // admin 显示"所属"列
   if (currentUser.role === 'admin') {
     document.getElementById('ownerTh').style.display = '';
@@ -2397,7 +2397,7 @@ async function confirmAction(msg) {
     if(existing) existing.remove();
     var d = document.createElement('div');
     d.className = 'confirm-toast';
-    d.innerHTML = '<span>' + msg + '</span><div style="display:flex;gap:8px;margin-top:8px">' +
+    d.innerHTML = '<span>' + esc(msg) + '</span><div style="display:flex;gap:8px;margin-top:8px">' +
       '<button class="btn btn-sm btn-green confirm-yes">确定</button>' +
       '<button class="btn btn-sm btn-red confirm-no">取消</button></div>';
     document.getElementById('appMain').appendChild(d);
@@ -2412,8 +2412,8 @@ function showDetail(title, content) {
   if(existing && existing.parentNode) existing.parentNode.removeChild(existing);
   var d = document.createElement('div');
   d.className = 'detail-toast';
-  d.innerHTML = '<div class="detail-header">' + title + '<button class="detail-close" onclick="var p=this.parentElement.parentElement;if(p&&p.parentNode)p.parentNode.removeChild(p)">&times;</button></div>' +
-    '<div class="detail-body">' + content + '</div>';
+  d.innerHTML = '<div class="detail-header">' + esc(title) + '<button class="detail-close" onclick="var p=this.parentElement.parentElement;if(p&&p.parentNode)p.parentNode.removeChild(p)">&times;</button></div>' +
+    '<div class="detail-body">' + safeHTML(content) + '</div>';
   document.getElementById('appMain').appendChild(d);
 }
 
@@ -2975,12 +2975,12 @@ async function doPublishExecute(){
     if (isScheduled) { body.schedule = true; body.scheduled_at = scheduledAt; }
     var res = await apiFetch(PAPI+'/accounts/'+_publishAccountId+'/publish/execute', {method:'POST', body:JSON.stringify(body)});
     if (res.scheduled) {
-      rDiv.innerHTML = '<div style="color:var(--blue);font-weight:600">⏰ 已安排定时发布</div><div style="font-size:12px;margin-top:4px">将于 ' + res.scheduled_at + ' 自动发布</div>';
+      rDiv.innerHTML = '<div style="color:var(--blue);font-weight:600">⏰ 已安排定时发布</div><div style="font-size:12px;margin-top:4px">将于 ' + esc(res.scheduled_at) + ' 自动发布</div>';
     } else if (res.success) {
-      rDiv.innerHTML = '<div style="color:var(--green);font-weight:600">✅ 发布成功！任务 #'+res.task_id+'</div>';
+      rDiv.innerHTML = '<div style="color:var(--green);font-weight:600">✅ 发布成功！任务 #'+esc(res.task_id)+'</div>';
       toast('内容发布成功！', 'success');
     } else {
-      rDiv.innerHTML = '<div style="color:var(--red);font-weight:600">❌ 发布失败</div><p style="font-size:12px;color:var(--text2)">'+(res.error||'未知错误')+'</p>';
+      rDiv.innerHTML = '<div style="color:var(--red);font-weight:600">❌ 发布失败</div><p style="font-size:12px;color:var(--text2)">'+esc(res.error||'未知错误')+'</p>';
       toast('发布失败: '+(res.error||'未知'), 'error');
     }
   } catch(e) {
@@ -3055,7 +3055,7 @@ function togglePublishPreview(){
     preview.style.display = 'none';
     toggle.classList.remove('active');
   } else {
-    var html = _publishEditor.root.innerHTML;
+    var html = safeHTML(_publishEditor.root.innerHTML);
     preview.innerHTML = '<span class="preview-badge">🔍 发布预览</span>' + html;
     preview.style.display = 'block';
     toggle.classList.add('active');
@@ -3210,14 +3210,15 @@ async function doComplianceCheck(){
     resultDiv.style.display = 'block';
     var score = res.compliance ? res.compliance.score : 100;
     var scoreColor = score >= 90 ? 'var(--green)' : score >= 60 ? 'var(--yellow)' : 'var(--red)';
-    document.getElementById('complianceScore').innerHTML = '<span style="color:'+scoreColor+'">' + score + '分</span> ' + (res.compliance ? res.compliance.suggestion : '');
+    document.getElementById('complianceScore').innerHTML = '<span style="color:'+scoreColor+'">' + score + '分</span> ' + esc(res.compliance ? res.compliance.suggestion : '');
     var risksDiv = document.getElementById('complianceRisks');
     if (res.compliance && res.compliance.risks && res.compliance.risks.length > 0) {
       risksDiv.innerHTML = '<p style="font-size:12px;color:var(--red);margin-bottom:6px">发现 ' + res.compliance.risks.length + ' 处风险词：</p>' +
         res.compliance.risks.map(function(r){ return '<div style="padding:6px 10px;background:#FEE2E2;border-radius:6px;margin:4px 0;font-size:12px"><span style="font-weight:600;color:var(--red)">'+esc(r.word)+'</span> <span style="color:var(--text2)">上下文: ...'+esc(r.context)+'...</span></div>'; }).join('');
       var hlDiv = document.getElementById('complianceHighlighted');
       hlDiv.style.display = 'block';
-      hlDiv.innerHTML = '<strong style="font-size:11px;color:var(--text2)">标记后的内容：</strong><br>' + (res.highlighted || content).replace(/\[\[/g, '<mark style="background:#FEE2E2;color:var(--red);padding:0 2px;border-radius:2px">').replace(/\]\]/g, '</mark>');
+      var hlContent = esc(res.highlighted || content).replace(/\[\[/g, '<mark style="background:#FEE2E2;color:var(--red);padding:0 2px;border-radius:2px">').replace(/\]\]/g, '</mark>');
+      hlDiv.innerHTML = '<strong style="font-size:11px;color:var(--text2)">标记后的内容：</strong><br>' + hlContent;
     } else {
       risksDiv.innerHTML = '<p style="color:var(--green);font-size:12px">✅ 未发现风险词</p>';
       document.getElementById('complianceHighlighted').style.display = 'none';
@@ -4317,7 +4318,19 @@ async function reviewDrafts(approved){
 // 工具函数
 // ════════════════════════════════════════
 
-function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(s){
+  if(s===null||s===undefined) return '';
+  var str=String(s);
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function attrEsc(s){
+  if(s===null||s===undefined) return '';
+  return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function safeHTML(html){
+  if(html===null||html===undefined) return '';
+  return String(html).replace(/<script[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi,'');
+}
 function intentBadge(i){
   if(i==='high') return '<span class="badge badge-high">高意向</span>';
   if(i==='medium') return '<span class="badge badge-medium">中意向</span>';

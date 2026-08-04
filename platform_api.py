@@ -1,14 +1,15 @@
 """多平台获客 API — 账号管理 · 目标发现 · 内容生成 · 评论执行 · 效果追踪"""
 import asyncio
 import json
+import re
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from database import (
     get_db, PlatformAccount, PlatformTask, PlatformTaskStatus,
@@ -19,11 +20,23 @@ from database import (
 from services import platform_manager, content_strategy, risk_control
 from services.ai_service import AIService
 from services.content_strategy import PLATFORM_STYLES
-from services.auth_service import get_current_user, has_permission
+from services.auth_service import get_current_user, has_permission, require_permission
 from config import settings
 from utils.permission import _is_admin, _get_team_user_ids, _filter_by_user, _own_or_admin
 
 router = APIRouter(prefix="/api/platforms", tags=["多平台获客"])
+
+
+def _parse_iso_utc(s: str) -> datetime:
+    """解析 ISO 时间字符串（带时区）并转换为 UTC naive datetime"""
+    try:
+        dt = datetime.fromisoformat(s)
+    except (ValueError, TypeError):
+        # 兼容无 T 的格式如 "2026-08-04 15:30:00"
+        dt = datetime.strptime(s.replace(" ", "T"), "%Y-%m-%dT%H:%M:%S")
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
 
 
 def _is_super_admin(user: User) -> bool:
@@ -185,7 +198,7 @@ def list_accounts(
     if status:
         q = q.filter(PlatformAccount.status == status)
     accounts = q.order_by(PlatformAccount.created_at.desc()).limit(settings.DEFAULT_PAGE_SIZE * 3).all()
-    return {"total": len(accounts), "data": [a.to_dict() for a in accounts]}
+    return {"total": len(accounts), "data": [a.to_public_dict() for a in accounts]}
 
 
 @router.get("/accounts/{account_id}")
@@ -193,7 +206,7 @@ def get_account(account_id: int, db: Session = Depends(get_db), current_user: Us
     acc = _own_or_admin(PlatformAccount, account_id, current_user, db)
     if not acc:
         raise HTTPException(404, "账号不存在")
-    return acc.to_dict()
+    return acc.to_public_dict()
 
 
 @router.post("/accounts")
@@ -202,7 +215,7 @@ def create_account(data: AccountCreate, db: Session = Depends(get_db), current_u
     db.add(acc)
     db.commit()
     db.refresh(acc)
-    return acc.to_dict()
+    return acc.to_public_dict()
 
 
 @router.put("/accounts/{account_id}")
@@ -214,7 +227,7 @@ def update_account(account_id: int, data: AccountUpdate, db: Session = Depends(g
         setattr(acc, k, v)
     db.commit()
     db.refresh(acc)
-    return acc.to_dict()
+    return acc.to_public_dict()
 
 
 @router.post("/accounts/{account_id}/unbind")
@@ -223,7 +236,7 @@ def unbind_account(account_id: int, db: Session = Depends(get_db), current_user:
     acc = _own_or_admin(PlatformAccount, account_id, current_user, db)
     if not acc:
         raise HTTPException(404, "账号不存在")
-    acc.user_id = None
+    acc.user_id = 0  # 0 表示"故意未分配"，与 NULL（历史遗留数据）区分
     db.commit()
     return {"unbound": account_id, "account_name": acc.account_name}
 
@@ -418,26 +431,32 @@ def get_task(task_id: int, db: Session = Depends(get_db), current_user: User = D
 
 @router.post("/tasks/generate")
 async def generate_content(req: GenerateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """为指定任务 AI 生成评论内容"""
-    results = []
-    for task_id in req.task_ids:
+    """为指定任务 AI 生成评论内容（并发执行）"""
+    sem = asyncio.Semaphore(3)
+
+    async def _gen_one(task_id):
         task = _own_or_admin(PlatformTask, task_id, current_user, db)
         if not task:
-            results.append({"task_id": task_id, "error": "任务不存在"})
-            continue
-        result = await platform_manager.generate_task_content(
-            task_id, req.product_info, db
-        )
-        results.append(result)
-    return {"data": results}
+            return {"task_id": task_id, "error": "任务不存在"}
+        try:
+            async with sem:
+                result = await platform_manager.generate_task_content(task_id, req.product_info, db)
+            return result
+        except Exception as e:
+            return {"task_id": task_id, "error": str(e)}
+
+    tasks = [_gen_one(tid) for tid in req.task_ids]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    return {"data": [r for r in results if not isinstance(r, Exception)]}
 
 
 @router.post("/tasks/{task_id}/variants")
-async def generate_variants(task_id: int, count: int = settings.DEFAULT_VARIANT_COUNT, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def generate_variants(task_id: int, count: int = Query(default=3, ge=1, le=10), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """为任务生成多个内容变体"""
     task = _own_or_admin(PlatformTask, task_id, current_user, db)
     if not task:
         raise HTTPException(404, "任务不存在")
+    count = max(1, min(count, 10))
     variants = await platform_manager.generate_variants(task_id, count, db)
     return {"task_id": task_id, "variants": variants}
 
@@ -500,7 +519,7 @@ def check_originality(
 # ════════════════════════════════════════════════════════════
 
 @router.post("/tasks/approve")
-def approve_tasks(req: ApproveRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def approve_tasks(req: ApproveRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user), _=Depends(require_permission("approve_content"))):
     """
     审核任务 — 通过/驳回/修改内容（兼容多级审核）
     """
@@ -524,6 +543,7 @@ def review_task_action(
     req: ReviewActionRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _=Depends(require_permission("approve_content")),
 ):
     """单条任务多级审核：approve / reject + 备注"""
     task = _own_or_admin(PlatformTask, task_id, current_user, db)
@@ -704,7 +724,7 @@ async def execute_publish_content(
     if req.schedule and req.scheduled_at:
         from services.scheduler import schedule_task
         try:
-            run_time = datetime.fromisoformat(req.scheduled_at)
+            run_time = _parse_iso_utc(req.scheduled_at)
             if run_time <= datetime.utcnow():
                 raise ValueError("定时发布时间必须在未来")
             task.status = PlatformTaskStatus.SCHEDULED.value
@@ -721,14 +741,11 @@ async def execute_publish_content(
         except (ValueError, TypeError) as ve:
             raise HTTPException(400, f"定时发布设置失败: {ve}")
 
-    # 即时发布
+    # 即时发布 — 直接执行已创建的任务
     await platform_manager.start()
     try:
-        result = await platform_manager.cross_platform_publish(
-            {"title": req.title, "content": req.content, "hashtags": []},
-            [account_id], db, user_id=current_user.id
-        )
-        success = any(r.get("success") for r in result) if result else False
+        result = await platform_manager.execute_publish(task.id, db)
+        success = result.get("success", False)
         task.status = "completed" if success else "failed"
         task.executed_at = datetime.utcnow()
         db.commit()
@@ -783,7 +800,7 @@ async def submit_publish_for_review(
     )
     if req.schedule and req.scheduled_at:
         try:
-            run_time = datetime.fromisoformat(req.scheduled_at)
+            run_time = _parse_iso_utc(req.scheduled_at)
             if run_time <= datetime.utcnow():
                 raise ValueError("定时发布时间必须在未来")
             task.status = PlatformTaskStatus.SCHEDULED.value
@@ -846,7 +863,7 @@ class AIGenerateRequest(BaseModel):
     platform: str
     topic: str = ""           # 生成主题
     category: str = settings.DEFAULT_TEMPLATE_CATEGORY
-    count: int = 3            # 生成数量
+    count: int = Field(default=3, ge=1, le=10, description="生成数量 (1-10)")
     style: str = ""           # 额外风格描述
 
 
@@ -1029,6 +1046,7 @@ def review_drafts(
     req: DraftReviewRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _=Depends(require_permission("approve_content")),
 ):
     """审核 AI 生成的草稿：通过 → 正式入素材库，驳回 → 标记为 rejected"""
     results = []
@@ -1067,21 +1085,24 @@ def get_platform_stats(db: Session = Depends(get_db), current_user: User = Depen
         if acc.status == "active":
             by_platform[acc.platform]["active"] += 1
 
-    by_status = {}
-    for s in PlatformTaskStatus:
-        c = _filter_by_user(db.query(PlatformTask), PlatformTask, current_user).filter(PlatformTask.status == s.value).count()
-        if c > 0:
-            by_status[s.value] = c
+    # 一次 GROUP BY 替代逐状态 count
+    status_rows = _filter_by_user(db.query(PlatformTask), PlatformTask, current_user)\
+        .with_entities(PlatformTask.status, func.count(PlatformTask.id))\
+        .group_by(PlatformTask.status).all()
+    tasks_by_status = {s: c for s, c in status_rows}
+
+    daily_comments = sum(a.daily_comment_count or 0 for a in accounts)
+    daily_publishes = sum(a.daily_publish_count or 0 for a in accounts)
 
     return {
         "total_accounts": len(accounts),
         "active_accounts": sum(1 for a in accounts if a.status == "active"),
         "by_platform": by_platform,
         "total_tasks": len(tasks),
-        "tasks_by_status": by_status,
+        "tasks_by_status": tasks_by_status,
         "daily_ops": {
-            "comments": sum(a.daily_comment_count or 0 for a in accounts),
-            "publishes": sum(a.daily_publish_count or 0 for a in accounts),
+            "comments": daily_comments,
+            "publishes": daily_publishes,
         },
     }
 
@@ -1092,6 +1113,16 @@ def reset_daily_quotas(current_user: User = Depends(get_current_user)):
     if not has_permission(current_user, "manage_team"):
         raise HTTPException(403, "权限不足")
     risk_control.reset_daily()
+    # 同时重置 DB 中的账号日计数
+    db = SessionLocal()
+    try:
+        db.query(PlatformAccount).update({
+            PlatformAccount.daily_comment_count: 0,
+            PlatformAccount.daily_publish_count: 0,
+        }, synchronize_session=False)
+        db.commit()
+    finally:
+        db.close()
     return {"message": "每日配额已重置"}
 
 
@@ -1202,7 +1233,7 @@ def import_knowledge(body: dict, db: Session = Depends(get_db), current_user: Us
 async def ai_generate_knowledge(body: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """AI 根据产品/业务描述批量生成 FAQ 条目"""
     topic = body.get("topic", "")
-    count = body.get("count", 10)
+    count = max(1, min(body.get("count", 10), 20))
     if not topic:
         raise HTTPException(400, "请提供 topic（产品/业务描述）")
 
@@ -1330,7 +1361,7 @@ async def ai_generate_topics(body: dict, db: Session = Depends(get_db), current_
     """AI 基于行业热词生成选题建议"""
     keywords = body.get("keywords", "")
     platform = body.get("platform", "通用")
-    count = body.get("count", 10)
+    count = max(1, min(body.get("count", 10), 20))
     if not keywords:
         raise HTTPException(400, "请提供 keywords（行业/关键词）")
 
@@ -1528,7 +1559,7 @@ def mark_all_read(
 
 
 @router.post("/inbox/{inbox_id}/generate-reply")
-def generate_ai_reply(
+async def generate_ai_reply(
     inbox_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -1540,15 +1571,14 @@ def generate_ai_reply(
     if not _is_admin(user) and item.user_id != user.id:
         raise HTTPException(403, "无权限")
 
-    # 使用 content_strategy 生成回复
     suggestion = ""
     try:
-        suggestion = asyncio.run(content_strategy.generate_reply(
+        suggestion = await content_strategy.generate_reply(
             platform=item.platform,
             original_comment=item.comment_text,
             commenter_name=item.commenter_name,
             persona="",
-        ))
+        )
     except Exception as e:
         suggestion = f"[AI生成失败: {e}]"
 
@@ -1558,34 +1588,43 @@ def generate_ai_reply(
 
 
 @router.post("/inbox/batch-generate-replies")
-def batch_generate_replies(
+async def batch_generate_replies(
     inbox_ids: list[int],
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """批量生成 AI 回复建议"""
-    results = []
+    """批量生成 AI 回复建议（并发执行，信号量控制）"""
+    sem = asyncio.Semaphore(3)
     items = db.query(CommentInbox).filter(CommentInbox.id.in_(inbox_ids)).all()
-    for item in items:
+
+    async def _gen_one(item):
         if not _is_admin(user) and item.user_id != user.id:
-            continue
+            return None
         try:
-            suggestion = asyncio.run(content_strategy.generate_reply(
-                platform=item.platform,
-                original_comment=item.comment_text,
-                commenter_name=item.commenter_name,
-                persona="",
-            ))
-            item.ai_reply_suggestion = suggestion
-            results.append({"id": item.id, "ai_reply_suggestion": suggestion})
+            async with sem:
+                suggestion = await content_strategy.generate_reply(
+                    platform=item.platform,
+                    original_comment=item.comment_text,
+                    commenter_name=item.commenter_name,
+                    persona="",
+                )
+            return {"id": item.id, "ai_reply_suggestion": suggestion}
         except Exception as e:
-            results.append({"id": item.id, "ai_reply_suggestion": f"[失败: {e}]"})
+            return {"id": item.id, "ai_reply_suggestion": f"[失败: {e}]"}
+
+    tasks = [_gen_one(item) for item in items]
+    results = [r for r in await asyncio.gather(*tasks) if r is not None]
+
+    for r in results:
+        item = db.query(CommentInbox).filter(CommentInbox.id == r["id"]).first()
+        if item:
+            item.ai_reply_suggestion = r["ai_reply_suggestion"]
     db.commit()
     return {"results": results}
 
 
 @router.post("/inbox/{inbox_id}/generate-answer")
-def generate_ai_answer(
+async def generate_ai_answer(
     inbox_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -1600,14 +1639,11 @@ def generate_ai_answer(
     if item.msg_type != "invitation":
         raise HTTPException(400, "该消息不是邀请回答类型")
 
-    # 从 comment_text 中提取问题标题（格式：用户名 邀请你回答问题 时间 问题标题）
     question_title = item.comment_text or ""
-    # 尝试提取问题标题：去掉邀请人名字和时间段，取最后部分
     for sep in ["邀请你回答问题", "邀请你回答"]:
         if sep in question_title:
             question_title = question_title.split(sep)[-1].strip()
             break
-    # 去掉可能残留的时间信息
     for time_word in ["刚刚", "分钟前", "小时前", "昨天", "前天", "2026-", "2025-"]:
         if time_word in question_title:
             question_title = question_title.split(time_word)[-1].strip()
@@ -1615,12 +1651,12 @@ def generate_ai_answer(
 
     suggestion = ""
     try:
-        suggestion = asyncio.run(content_strategy.generate_answer(
+        suggestion = await content_strategy.generate_answer(
             platform=item.platform,
             question_title=question_title or item.comment_text[:100],
             question_description="",
             persona="",
-        ))
+        )
     except Exception as e:
         suggestion = f"[AI生成失败: {e}]"
 
@@ -1771,7 +1807,7 @@ async def execute_reply(
 
 
 @router.post("/inbox/check-now")
-def check_notifications_now(
+async def check_notifications_now(
     account_id: Optional[int] = None,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -1780,16 +1816,14 @@ def check_notifications_now(
     from services.notification_service import notification_service
 
     if account_id:
-        # 检查权限
         acc = db.query(PlatformAccount).filter(PlatformAccount.id == account_id).first()
         if not acc:
             raise HTTPException(404, "账号不存在")
         if not _is_admin(user) and acc.user_id != user.id:
             raise HTTPException(403, "无权限")
-        result = asyncio.run(notification_service.check_account_now(account_id))
+        result = await notification_service.check_account_now(account_id)
         return result
 
-    # 检查所有活跃账号
     accounts = db.query(PlatformAccount).filter(
         PlatformAccount.status.in_(["active", "warming"])
     ).all()
@@ -1799,7 +1833,7 @@ def check_notifications_now(
     results = []
     for acc in accounts:
         try:
-            r = asyncio.run(notification_service.check_account_now(acc.id))
+            r = await notification_service.check_account_now(acc.id)
             results.append(r)
         except Exception as e:
             results.append({"account_id": acc.id, "error": str(e)})
@@ -1809,7 +1843,7 @@ def check_notifications_now(
 
 
 @router.post("/inbox/debug/{account_id}")
-def debug_notifications(
+async def debug_notifications(
     account_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -1829,24 +1863,24 @@ def debug_notifications(
     notifications = []
     error = None
     try:
-        asyncio.run(browser_engine.start())
-        asyncio.run(platform.setup())
-        logged = asyncio.run(platform.login())
+        await browser_engine.start()
+        await platform.setup()
+        logged = await platform.login()
         if not logged:
             raise Exception("登录失败")
         if hasattr(platform, "get_notifications"):
-            notifications = asyncio.run(platform.get_notifications(limit=30))
+            notifications = await platform.get_notifications(limit=30)
         else:
             error = f"平台 {account.platform} 未实现 get_notifications"
     except Exception as e:
         error = str(e)
     finally:
         try:
-            asyncio.run(platform.teardown())
+            await platform.teardown()
         except Exception:
             pass
         try:
-            asyncio.run(browser_engine.stop())
+            await browser_engine.stop()
         except Exception:
             pass
 
@@ -2034,19 +2068,29 @@ def get_dashboard_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """综合仪表盘数据（支持自定义日期范围）"""
+    """综合仪表盘数据（支持自定义日期范围，已优化为 4 次 SQL 查询）"""
     s, e = _parse_date_range(start_date, end_date, default_days=30)
+    days_count = (e - s).days
 
     accounts = _filter_by_user(db.query(PlatformAccount), PlatformAccount, current_user)
     active_accounts = accounts.filter(PlatformAccount.status == "active").count()
+    total_accounts = accounts.count()
     total_followers = accounts.with_entities(func.coalesce(func.sum(PlatformAccount.follower_count), 0)).scalar() or 0
 
+    # ── 汇总查询：1 次聚合拿全部 summary ──
     task_q = _filter_by_user(db.query(PlatformTask), PlatformTask, current_user).filter(
         PlatformTask.created_at >= s, PlatformTask.created_at < e
     )
     total_tasks = task_q.count()
-    completed_tasks = task_q.filter(PlatformTask.status == PlatformTaskStatus.COMPLETED.value).count()
-    scheduled_tasks = task_q.filter(PlatformTask.status == PlatformTaskStatus.SCHEDULED.value).count()
+    by_status = dict(
+        _filter_by_user(db.query(PlatformTask), PlatformTask, current_user)
+        .filter(PlatformTask.created_at >= s, PlatformTask.created_at < e)
+        .with_entities(PlatformTask.status, func.count(PlatformTask.id))
+        .group_by(PlatformTask.status)
+        .all()
+    )
+    completed_tasks = by_status.get(PlatformTaskStatus.COMPLETED.value, 0)
+    scheduled_tasks = by_status.get(PlatformTaskStatus.SCHEDULED.value, 0)
     pending_review = _filter_by_user(db.query(PlatformTask), PlatformTask, current_user).filter(
         PlatformTask.status == PlatformTaskStatus.PENDING.value
     ).count()
@@ -2062,33 +2106,50 @@ def get_dashboard_stats(
     total_bookmarks = perf_q.with_entities(func.coalesce(func.sum(ContentPerformance.bookmarks), 0)).scalar() or 0
     total_interactions = total_likes + total_comments + total_shares + total_bookmarks
 
-    # 趋势图
+    # ── 趋势图：2 次 GROUP BY 查询替代 30*7=210 次查询 ──
+    task_trend_rows = _filter_by_user(db.query(PlatformTask), PlatformTask, current_user).filter(
+        PlatformTask.status == PlatformTaskStatus.COMPLETED.value,
+        PlatformTask.executed_at >= s, PlatformTask.executed_at < e,
+    ).with_entities(
+        func.date(PlatformTask.executed_at),
+        func.count(PlatformTask.id),
+    ).group_by(func.date(PlatformTask.executed_at)).all()
+    task_trend_map = {str(r[0]): r[1] for r in task_trend_rows}
+
+    perf_trend_rows = perf_q.with_entities(
+        func.date(ContentPerformance.published_at),
+        func.coalesce(func.sum(ContentPerformance.views), 0),
+        func.coalesce(func.sum(ContentPerformance.likes), 0),
+        func.coalesce(func.sum(ContentPerformance.comments), 0),
+        func.coalesce(func.sum(ContentPerformance.shares), 0),
+        func.coalesce(func.sum(ContentPerformance.bookmarks), 0),
+    ).group_by(func.date(ContentPerformance.published_at)).all()
+    perf_trend_map = {
+        str(r[0]): {"views": r[1], "likes": r[2], "comments": r[3], "shares": r[4], "bookmarks": r[5]}
+        for r in perf_trend_rows
+    }
+
     trend_works, trend_interactions = [], []
     trend_views, trend_likes, trend_comments, trend_shares, trend_bookmarks = [], [], [], [], []
-    for i in range((e - s).days):
+    for i in range(days_count):
         day = s + timedelta(days=i)
-        day_end = day + timedelta(days=1)
         label = day.strftime("%m-%d")
-        works_count = _filter_by_user(db.query(PlatformTask), PlatformTask, current_user).filter(
-            PlatformTask.status == PlatformTaskStatus.COMPLETED.value,
-            PlatformTask.executed_at >= day, PlatformTask.executed_at < day_end,
-        ).count()
-        interactions = _filter_by_user_perf(db.query(ContentPerformance), ContentPerformance, current_user, db).filter(
-            ContentPerformance.published_at >= day, ContentPerformance.published_at < day_end,
-        )
-        views_sum = interactions.with_entities(func.coalesce(func.sum(ContentPerformance.views), 0)).scalar() or 0
-        likes_sum = interactions.with_entities(func.coalesce(func.sum(ContentPerformance.likes), 0)).scalar() or 0
-        comments_sum = interactions.with_entities(func.coalesce(func.sum(ContentPerformance.comments), 0)).scalar() or 0
-        shares_sum = interactions.with_entities(func.coalesce(func.sum(ContentPerformance.shares), 0)).scalar() or 0
-        bookmarks_sum = interactions.with_entities(func.coalesce(func.sum(ContentPerformance.bookmarks), 0)).scalar() or 0
-        inter_sum = likes_sum + comments_sum + shares_sum + bookmarks_sum
+        day_key = day.strftime("%Y-%m-%d")
+        works_count = task_trend_map.get(day_key, 0)
+        p = perf_trend_map.get(day_key, {})
+        v = p.get("views", 0)
+        l = p.get("likes", 0)
+        c = p.get("comments", 0)
+        sh = p.get("shares", 0)
+        bm = p.get("bookmarks", 0)
+        inter = l + c + sh + bm
         trend_works.append({"date": label, "value": works_count})
-        trend_interactions.append({"date": label, "value": inter_sum})
-        trend_views.append({"date": label, "value": views_sum})
-        trend_likes.append({"date": label, "value": likes_sum})
-        trend_comments.append({"date": label, "value": comments_sum})
-        trend_shares.append({"date": label, "value": shares_sum})
-        trend_bookmarks.append({"date": label, "value": bookmarks_sum})
+        trend_interactions.append({"date": label, "value": inter})
+        trend_views.append({"date": label, "value": v})
+        trend_likes.append({"date": label, "value": l})
+        trend_comments.append({"date": label, "value": c})
+        trend_shares.append({"date": label, "value": sh})
+        trend_bookmarks.append({"date": label, "value": bm})
 
     # 平台分布
     by_platform = {}
@@ -2236,6 +2297,11 @@ def analytics_works(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    SORT_WHITELIST = {"published_at", "views", "likes", "comments", "shares", "bookmarks"}
+    if sort not in SORT_WHITELIST:
+        raise HTTPException(400, f"Invalid sort field. Allowed: {', '.join(sorted(SORT_WHITELIST))}")
+    if order not in ("asc", "desc"):
+        raise HTTPException(400, "Invalid order. Use 'asc' or 'desc'")
     s, e = _parse_date_range(start_date, end_date, default_days=30)
     q = _filter_by_user_perf(db.query(ContentPerformance), ContentPerformance, current_user, db).filter(
         ContentPerformance.published_at >= s, ContentPerformance.published_at < e
@@ -2285,6 +2351,13 @@ def analytics_rankings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    DIMENSION_WHITELIST = {"account", "work", "platform"}
+    if dimension not in DIMENSION_WHITELIST:
+        raise HTTPException(400, f"Invalid dimension. Allowed: {', '.join(sorted(DIMENSION_WHITELIST))}")
+
+    METRIC_WHITELIST = {"views", "likes", "comments", "shares", "bookmarks", "interactions", "followers"}
+    if metric not in METRIC_WHITELIST:
+        raise HTTPException(400, f"Invalid metric. Allowed: {', '.join(sorted(METRIC_WHITELIST))}")
     s, e = _parse_date_range(start_date, end_date, default_days=30)
     if dimension == "platform":
         metric_col = {
@@ -2300,7 +2373,16 @@ def analytics_rankings(
         ).group_by(ContentPerformance.platform).order_by(metric_col.desc()).limit(limit).all()
         data = [{"rank": i + 1, "name": r[0], "works": r[1], "value": r[2] or 0} for i, r in enumerate(rows)]
     elif dimension == "work":
-        metric_col = getattr(ContentPerformance, metric, ContentPerformance.views)
+        work_metric_map = {
+            "views": ContentPerformance.views,
+            "likes": ContentPerformance.likes,
+            "comments": ContentPerformance.comments,
+            "shares": ContentPerformance.shares,
+            "bookmarks": ContentPerformance.bookmarks,
+            "interactions": (ContentPerformance.likes + ContentPerformance.comments +
+                             ContentPerformance.shares + ContentPerformance.bookmarks),
+        }
+        metric_col = work_metric_map.get(metric, ContentPerformance.views)
         rows = _filter_by_user_perf(db.query(ContentPerformance), ContentPerformance, current_user, db).filter(
             ContentPerformance.published_at >= s, ContentPerformance.published_at < e
         ).order_by(metric_col.desc()).limit(limit).all()
@@ -2310,10 +2392,19 @@ def analytics_rankings(
                 acc = db.query(PlatformAccount).filter(PlatformAccount.id == aid).first()
                 acc_cache[aid] = acc.account_name if acc else "-"
             return acc_cache[aid]
+        work_value_map = {
+            "views": lambda r: r.views or 0,
+            "likes": lambda r: r.likes or 0,
+            "comments": lambda r: r.comments or 0,
+            "shares": lambda r: r.shares or 0,
+            "bookmarks": lambda r: r.bookmarks or 0,
+            "interactions": lambda r: (r.likes or 0) + (r.comments or 0) + (r.shares or 0) + (r.bookmarks or 0),
+        }
+        value_fn = work_value_map.get(metric, lambda r: r.views or 0)
         data = [{
             "rank": i + 1, "id": r.id, "name": r.title or "无标题",
             "platform": r.platform, "account_name": acc_name(r.account_id),
-            "value": getattr(r, metric, 0),
+            "value": value_fn(r),
         } for i, r in enumerate(rows)]
     else:  # account
         rows = _filter_by_user(db.query(PlatformAccount), PlatformAccount, current_user)
@@ -2516,7 +2607,7 @@ async def video_upload_platform(
     )
     if req.schedule and req.scheduled_at:
         try:
-            run_time = datetime.fromisoformat(req.scheduled_at)
+            run_time = _parse_iso_utc(req.scheduled_at)
             if run_time <= datetime.utcnow():
                 raise ValueError("时间必须在未来")
             task.status = PlatformTaskStatus.SCHEDULED.value

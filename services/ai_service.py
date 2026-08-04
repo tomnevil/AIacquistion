@@ -1,4 +1,5 @@
 """AI 服务模块 — 客户评分、意向分析、话术生成"""
+import asyncio
 import json
 import httpx
 from config import settings
@@ -94,15 +95,25 @@ AI评分: {lead.get('ai_score', '未评分')}分"""
         return await AIService._call_ai(system, user)
 
     @staticmethod
-    async def batch_analyze(leads: list) -> list:
-        """批量分析客户，返回排序后的结果"""
-        results = []
-        for lead in leads:
-            analysis = await AIService.score_lead(lead)
-            results.append({**lead, **analysis})
-        # 按评分降序
-        results.sort(key=lambda x: x.get("score", 0), reverse=True)
-        return results
+    async def batch_analyze(leads: list, max_concurrent: int = 3) -> list:
+        """批量分析客户，并发执行，返回排序后的结果"""
+        sem = asyncio.Semaphore(max_concurrent)
+
+        async def _analyze_one(lead):
+            async with sem:
+                analysis = await AIService.score_lead(lead)
+                return {**lead, **analysis}
+
+        tasks = [_analyze_one(lead) for lead in leads]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        valid = [r for r in results if not isinstance(r, Exception)]
+        errors = [str(r) for r in results if isinstance(r, Exception)]
+        if errors:
+            print(f"[AI] batch_analyze errors: {errors}")
+
+        valid.sort(key=lambda x: x.get("score", 0), reverse=True)
+        return valid
 
     @staticmethod
     async def recommend_strategy(leads_data: list) -> str:

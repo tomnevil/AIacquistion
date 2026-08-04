@@ -143,18 +143,25 @@ def delete_lead(lead_id: int, db: Session = Depends(get_db), current_user: User 
 
 @router.post("/leads/import")
 def import_csv(file: UploadFile = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """从 CSV 批量导入客户"""
+    """从 CSV 批量导入客户 — 逐行校验，坏行跳过，不影响其他行"""
     content = file.file.read().decode(settings.DEFAULT_ENCODING)
     reader = csv.DictReader(io.StringIO(content))
     count = 0
+    skipped = 0
     errors = []
     col_map = settings.CSV_COLUMN_MAP
 
-    for row in reader:
+    for row_num, row in enumerate(reader, start=2):  # 从第2行开始（第1行是表头）
         try:
+            name = row.get(col_map["name"][0], row.get(col_map["name"][1], "")).strip()
+            if not name:
+                skipped += 1
+                errors.append({"row": row_num, "error": "缺少必填字段: name (公司/客户名)"})
+                continue
+
             lead = Lead(
                 user_id=current_user.id,
-                name=row.get(col_map["name"][0], row.get(col_map["name"][1], "")),
+                name=name,
                 company=row.get(col_map["company"][0], row.get(col_map["company"][1], "")),
                 email=row.get(col_map["email"][0], row.get(col_map["email"][1], "")),
                 phone=row.get(col_map["phone"][0], row.get(col_map["phone"][1], "")),
@@ -163,12 +170,15 @@ def import_csv(file: UploadFile = File(...), db: Session = Depends(get_db), curr
                 source=LeadSource.CSV_IMPORT.value,
             )
             db.add(lead)
+            db.flush()  # 逐行 flush，提前发现约束错误
             count += 1
         except Exception as e:
-            errors.append({"row": row, "error": str(e)})
+            db.rollback()
+            skipped += 1
+            errors.append({"row": row_num, "error": str(e)})
 
     db.commit()
-    return {"imported": count, "errors": errors}
+    return {"imported": count, "skipped": skipped, "errors": errors}
 
 
 # ── AI 分析 ──

@@ -45,7 +45,7 @@ delete window.callPhantom;
 
 class BrowserEngine:
     """
-    浏览器自动化引擎
+    浏览器自动化引擎（引用计数防止并发请求互关浏览器）
     
     核心能力:
     - Playwright 驱动的真实浏览器
@@ -61,32 +61,42 @@ class BrowserEngine:
     def __init__(self):
         self.BROWSER_DATA_DIR.mkdir(exist_ok=True)
         self._playwright = None
-        self._browsers: dict[str, Browser] = {}  # 每个账号一个浏览器实例
+        self._browsers: dict[str, Browser] = {}
         self._contexts: dict[int, BrowserContext] = {}
+        self._ref_count = 0  # 引用计数
+        self._lock = asyncio.Lock()  # 保护并发启动/停止
 
     async def start(self):
-        """启动 Playwright"""
-        self._playwright = await async_playwright().start()
+        """启动 Playwright（引用计数，可并发调用）"""
+        async with self._lock:
+            self._ref_count += 1
+            if self._playwright is None:
+                self._playwright = await async_playwright().start()
 
     async def stop(self):
-        """停止所有浏览器"""
-        for ctx in self._contexts.values():
-            try:
-                await ctx.close()
-            except:
-                pass
-        self._contexts.clear()
-        for browser in self._browsers.values():
-            try:
-                await browser.close()
-            except:
-                pass
-        self._browsers.clear()
-        if self._playwright:
-            try:
-                await self._playwright.stop()
-            except:
-                pass
+        """释放引用，引用归零时真正关闭"""
+        async with self._lock:
+            self._ref_count = max(0, self._ref_count - 1)
+            if self._ref_count > 0:
+                return
+            # 引用归零，真正关闭所有资源
+            for ctx in self._contexts.values():
+                try:
+                    await ctx.close()
+                except:
+                    pass
+            self._contexts.clear()
+            for browser in self._browsers.values():
+                try:
+                    await browser.close()
+                except:
+                    pass
+            self._browsers.clear()
+            if self._playwright:
+                try:
+                    await self._playwright.stop()
+                except:
+                    pass
             self._playwright = None
 
     async def get_context(self, account: dict) -> BrowserContext:

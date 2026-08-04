@@ -123,22 +123,20 @@ class NotificationService:
         return result
 
     async def _check_all_accounts(self):
-        """检查所有活跃账号"""
+        """检查所有活跃账号（仅检查到了轮询时间的账号）"""
         db = SessionLocal()
         try:
             accounts = db.query(PlatformAccount).filter(
                 PlatformAccount.status.in_(["active", "warming"])
             ).all()
 
-            # 只检查到了轮询时间的账号
             now = datetime.utcnow()
             for acc in accounts:
                 last = self._last_check.get(acc.id)
                 if last and (now - last).total_seconds() < self._interval * 0.8:
-                    continue  # 还没到下次检查时间
-                self._last_check[acc.id] = now
+                    continue  # 还没到下次检查时间，跳过
 
-            for acc in accounts:
+                self._last_check[acc.id] = now
                 try:
                     await self._check_single_account(acc.id, db)
                 except Exception as e:
@@ -172,44 +170,25 @@ class NotificationService:
             account_dict = account.to_dict()
             platform_name = account.platform
 
-            # 导入对应平台
+            # 使用统一的平台注册表
             try:
-                from platforms.zhihu import ZhihuPlatform
-                from platforms.weibo import WeiboPlatform
-                from platforms.douyin import DouyinPlatform
-                from platforms.xiaohongshu import XiaohongshuPlatform
-                from platforms.bilibili import BilibiliPlatform
-                from platforms.toutiao import ToutiaoPlatform
-            except ImportError as e:
-                result["error"] = f"平台模块导入失败: {e}"
+                from platforms import get_platform
+                platform_instance = get_platform(platform_name, account_dict)
+            except (ImportError, ValueError) as e:
+                result["error"] = str(e)
                 return result
-
-            platform_map = {
-                "zhihu": ZhihuPlatform,
-                "weibo": WeiboPlatform,
-                "douyin": DouyinPlatform,
-                "xiaohongshu": XiaohongshuPlatform,
-                "bilibili": BilibiliPlatform,
-                "toutiao": ToutiaoPlatform,
-            }
-            platform_cls = platform_map.get(platform_name)
-            if not platform_cls:
-                result["error"] = f"不支持的平台: {platform_name}"
-                return result
-
-            platform = platform_cls(account_dict)
-            await platform.setup()
-            logged = await platform.login()
+            await platform_instance.setup()
+            logged = await platform_instance.login()
             if not logged:
                 result["error"] = "登录失败"
-                await platform.teardown()
+                await platform_instance.teardown()
                 return result
 
             # 获取通知
             notifications = []
-            if hasattr(platform, "get_notifications"):
-                notifications = await platform.get_notifications(limit=20)
-            elif hasattr(platform, "get_my_comments"):
+            if hasattr(platform_instance, "get_notifications"):
+                notifications = await platform_instance.get_notifications(limit=20)
+            elif hasattr(platform_instance, "get_my_comments"):
                 # 回退：检查最近内容下的评论
                 recent_tasks = db.query(PlatformTask).filter(
                     PlatformTask.account_id == account_id,
@@ -223,7 +202,7 @@ class NotificationService:
 
                 for task in recent_tasks:
                     if task.target_url:
-                        comments = await platform.get_my_comments(task.target_url)
+                        comments = await platform_instance.get_my_comments(task.target_url)
                         for c in comments:
                             notifications.append({
                                 "external_id": c.get("comment_id", ""),
@@ -235,10 +214,10 @@ class NotificationService:
                             })
             else:
                 result["error"] = "该平台暂不支持通知拉取"
-                await platform.teardown()
+                await platform_instance.teardown()
                 return result
 
-            await platform.teardown()
+            await platform_instance.teardown()
 
             # 先清理该账号已有的重复数据（兜底，防止 hash() 历史问题残留）
             try:

@@ -2,7 +2,12 @@
 import sys
 import asyncio
 import traceback
+import uuid
 from contextlib import asynccontextmanager
+
+# 日志配置
+from utils.logger import setup_logging
+app_logger = setup_logging(settings.LOG_LEVEL if hasattr(settings, "LOG_LEVEL") else "INFO")
 
 # ⚠ 必须在创建事件循环之前设置策略
 if sys.platform == "win32":
@@ -31,7 +36,7 @@ async def lifespan(app: FastAPI):
     if not settings.JWT_SECRET:
         raise RuntimeError("请在 .env 文件中设置 JWT_SECRET")
     init_db()
-    print(f"[OK] AI 获客系统已启动: http://{settings.APP_HOST}:{settings.APP_PORT}")
+    app_logger.info(f"AI 获客系统已启动: http://{settings.APP_HOST}:{settings.APP_PORT}")
 
     # 启动评论监控服务
     try:
@@ -39,14 +44,14 @@ async def lifespan(app: FastAPI):
         notification_service.set_interval(settings.AUTO_MONITOR_INTERVAL)
         await notification_service.start()
     except Exception as e:
-        print(f"[WARN] 通知监控服务启动失败: {e}")
+        app_logger.warning(f"通知监控服务启动失败: {e}")
 
     # 启动定时发布调度器
     try:
         from services.scheduler import start_scheduler
         await start_scheduler()
     except Exception as e:
-        print(f"[WARN] 定时调度器启动失败: {e}")
+        app_logger.warning(f"定时调度器启动失败: {e}")
 
     yield
 
@@ -62,7 +67,7 @@ async def lifespan(app: FastAPI):
         await notification_service.stop()
     except Exception:
         pass
-    print("[OK] AI 获客系统已关闭")
+    app_logger.info("AI 获客系统已关闭")
 
 
 app = FastAPI(
@@ -80,12 +85,17 @@ app.include_router(platform_router)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """全局异常处理"""
+    """全局异常处理 — 服务端记录完整日志，客户端仅返回通用错误"""
+    error_id = uuid.uuid4().hex[:8]
     tb = traceback.format_exc()
-    print(f"[ERROR] {tb}")
+    logging.error(
+        "[%s] %s %s — %s: %s\n%s",
+        error_id, request.method, request.url.path,
+        type(exc).__name__, str(exc), tb,
+    )
     return JSONResponse(
         status_code=500,
-        content={"detail": str(exc)},
+        content={"detail": "服务器内部错误，请稍后重试", "error_id": error_id},
     )
 
 

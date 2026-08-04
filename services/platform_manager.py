@@ -245,7 +245,7 @@ class PlatformManager:
 
                 # 记录风控
                 risk_control.record_action(account_dict, "comment")
-                risk_control.record_content(content_to_use)
+                risk_control.record_content(content_to_use, account_id=account.id)
 
                 db.commit()
                 return {"success": True, "task_id": task_id}
@@ -343,8 +343,10 @@ class PlatformManager:
         from platforms.models import PlatformAccount
 
         task = db.query(PlatformTask).filter(PlatformTask.id == task_id).first()
-        if not task or task.status != TaskStatus.APPROVED.value:
-            return {"error": "任务状态不允许执行"}
+        if not task:
+            return {"error": "任务不存在"}
+        if task.status not in (TaskStatus.APPROVED.value, TaskStatus.SCHEDULED.value):
+            return {"error": f"任务状态不允许执行 (当前: {task.status})"}
 
         account = db.query(PlatformAccount).filter(
             PlatformAccount.id == task.account_id
@@ -566,6 +568,9 @@ class PlatformManager:
                 "platform": account.platform,
                 "task_id": task.id,
                 "adapted_title": adapted.get("title"),
+                "success": True,
+                "status": "pending",
+                "message": "内容已适配，等待审核",
             })
 
         return results
@@ -624,15 +629,15 @@ class PlatformManager:
             await self.stop()
 
     # ═══════════════════════════════════════════════════
-    #  启动 & 清理
+    #  启动 & 清理（已委托给 BrowserEngine 的引用计数机制）
     # ═══════════════════════════════════════════════════
 
     async def start(self):
-        """启动浏览器引擎"""
+        """启动浏览器引擎（引用计数，可并发）"""
         await browser_engine.start()
 
     async def stop(self):
-        """关闭所有浏览器"""
+        """释放浏览器引擎引用（引用归零时真正关闭）"""
         await browser_engine.stop()
 
 

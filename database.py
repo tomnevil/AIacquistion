@@ -11,7 +11,28 @@ SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 
 class Base(DeclarativeBase):
-    pass
+    """统一模型基类 — 提供 to_dict / to_public_dict"""
+
+    # 子类可覆盖的字段白名单（to_public_dict 会剔除）
+    SENSITIVE_FIELDS: set = set()
+
+    def to_dict(self):
+        """序列化全部字段（内部使用）"""
+        d = {}
+        for c in self.__table__.columns:
+            v = getattr(self, c.name)
+            if hasattr(v, 'isoformat'):
+                d[c.name] = v.isoformat() if v else None
+            else:
+                d[c.name] = v
+        return d
+
+    def to_public_dict(self):
+        """对外安全版本 — 剔除敏感字段"""
+        d = self.to_dict()
+        for field in self.SENSITIVE_FIELDS:
+            d.pop(field, None)
+        return d
 
 
 # ── 多平台社媒获客 枚举 ──
@@ -115,16 +136,6 @@ class Lead(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    def to_dict(self):
-        d = {}
-        for c in self.__table__.columns:
-            v = getattr(self, c.name)
-            if hasattr(v, 'isoformat'):
-                d[c.name] = v.isoformat() if v else None
-            else:
-                d[c.name] = v
-        return d
-
 
 class OutreachRecord(Base):
     """外联记录表"""
@@ -173,15 +184,7 @@ class PlatformAccount(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    def to_dict(self):
-        d = {}
-        for c in self.__table__.columns:
-            v = getattr(self, c.name)
-            if hasattr(v, 'isoformat'):
-                d[c.name] = v.isoformat() if v else None
-            else:
-                d[c.name] = v
-        return d
+    SENSITIVE_FIELDS = {"password_encrypted", "cookies_json", "proxy"}
 
 
 class PlatformTask(Base):
@@ -214,16 +217,6 @@ class PlatformTask(Base):
     scheduled_at = Column(DateTime, nullable=True)
     executed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-
-    def to_dict(self):
-        d = {}
-        for c in self.__table__.columns:
-            v = getattr(self, c.name)
-            if hasattr(v, 'isoformat'):
-                d[c.name] = v.isoformat() if v else None
-            else:
-                d[c.name] = v
-        return d
 
 
 class ContentLibrary(Base):
@@ -263,6 +256,8 @@ class User(Base):
     """系统用户表"""
     __tablename__ = "users"
 
+    SENSITIVE_FIELDS = {"password_hash"}
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String(50), unique=True, nullable=False, index=True)
     password_hash = Column(String(200), nullable=False)
@@ -271,16 +266,9 @@ class User(Base):
     role = Column(String(20), default="viewer")  # admin / manager / editor / viewer
     team_id = Column(Integer, nullable=True, index=True)  # 所属团队
     is_active = Column(Boolean, default=True)
+    must_change_password = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login_at = Column(DateTime, nullable=True)
-
-    def to_dict(self):
-        return {
-            "id": self.id, "username": self.username, "email": self.email,
-            "display_name": self.display_name, "role": self.role,
-            "team_id": self.team_id, "is_active": self.is_active,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-        }
 
 
 class EngagementRecord(Base):
@@ -316,17 +304,6 @@ class KnowledgeBase(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    def to_dict(self):
-        d = {}
-        for c in self.__table__.columns:
-            v = getattr(self, c.name)
-            if hasattr(v, 'isoformat'):
-                d[c.name] = v.isoformat() if v else None
-            else:
-                d[c.name] = v
-        return d
-
-
 class TopicLibrary(Base):
     """选题库 — AI生成 + 人工管理"""
     __tablename__ = "topic_library"
@@ -345,15 +322,6 @@ class TopicLibrary(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    def to_dict(self):
-        d = {}
-        for c in self.__table__.columns:
-            v = getattr(self, c.name)
-            if hasattr(v, 'isoformat'):
-                d[c.name] = v.isoformat() if v else None
-            else:
-                d[c.name] = v
-        return d
 
 
 class AuditLog(Base):
@@ -370,15 +338,6 @@ class AuditLog(Base):
     ip_address = Column(String(50), default="")
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    def to_dict(self):
-        d = {}
-        for c in self.__table__.columns:
-            v = getattr(self, c.name)
-            if hasattr(v, 'isoformat'):
-                d[c.name] = v.isoformat() if v else None
-            else:
-                d[c.name] = v
-        return d
 
 
 class CommentInbox(Base):
@@ -419,15 +378,6 @@ class CommentInbox(Base):
     replied_at = Column(DateTime, nullable=True)                 # 回复时间
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    def to_dict(self):
-        d = {}
-        for c in self.__table__.columns:
-            v = getattr(self, c.name)
-            if hasattr(v, 'isoformat'):
-                d[c.name] = v.isoformat() if v else None
-            else:
-                d[c.name] = v
-        return d
 
 
 # ── PRD 扩展：账号分组 & 内容效果 & 团队协作 ──
@@ -441,15 +391,6 @@ class AccountGroup(Base):
     description = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    def to_dict(self):
-        d = {}
-        for c in self.__table__.columns:
-            v = getattr(self, c.name)
-            if hasattr(v, 'isoformat'):
-                d[c.name] = v.isoformat() if v else None
-            else:
-                d[c.name] = v
-        return d
 
 
 class AccountGroupMember(Base):
@@ -480,15 +421,6 @@ class ContentPerformance(Base):
     published_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    def to_dict(self):
-        d = {}
-        for c in self.__table__.columns:
-            v = getattr(self, c.name)
-            if hasattr(v, 'isoformat'):
-                d[c.name] = v.isoformat() if v else None
-            else:
-                d[c.name] = v
-        return d
 
 
 class TeamInvitation(Base):
@@ -632,21 +564,33 @@ def init_db():
             db.rollback()
         db.commit()
 
-        # 多级审核 + 负责人字段迁移
+        # ── 注意: 数据库迁移已由 Alembic 管理 (alembic/versions/) ──
+        # 以下迁移仅作为旧版库的幂等兼容补丁，生产环境请使用 alembic upgrade head
+        # 参考: python -m alembic upgrade head
+
+        # 幂等列添加（检查列是否存在再 ALTER，避免重复迁移报错）
+        def _ensure_column(db_conn, table, col, dtype):
+            result = db_conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
+            existing = {row[1] for row in result}
+            if col not in existing:
+                db_conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {dtype}"))
+                db_conn.commit()
+
+        # 多级审核 + 负责人
         for table, col, dtype in [
             ("platform_tasks", "review_level", "INTEGER DEFAULT 0"),
             ("platform_tasks", "review_history", "TEXT DEFAULT '[]'"),
             ("platform_accounts", "owner", "VARCHAR(100) DEFAULT ''"),
         ]:
             try:
-                db.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {dtype}"))
-                db.commit()
+                _ensure_column(db, table, col, dtype)
             except Exception:
                 db.rollback()
 
-        # 团队 & 权限细化字段迁移
+        # 团队 & 权限细化
         for table, col, dtype in [
             ("users", "team_id", "INTEGER"),
+            ("users", "must_change_password", "BOOLEAN DEFAULT 0"),
             ("team_invitations", "team_id", "INTEGER"),
             ("team_invitations", "invitee_role", "VARCHAR(20) DEFAULT 'editor'"),
             ("team_invitations", "invite_code", "VARCHAR(20)"),
@@ -654,33 +598,38 @@ def init_db():
             ("team_invitations", "use_count", "INTEGER DEFAULT 0"),
         ]:
             try:
-                db.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {dtype}"))
-                db.commit()
+                _ensure_column(db, table, col, dtype)
             except Exception:
                 db.rollback()
 
         admin = db.query(User).filter(User.username == "admin").first()
         if not admin:
             from services.auth_service import hash_password
+            import secrets
+            import string
             # 为 admin 创建默认团队
             admin_team = Team(name="默认团队", owner_id=0)  # owner_id 先占位
             db.add(admin_team)
             db.flush()
             admin_team.owner_id = 1  # admin id 将为 1
+            # 生成随机初始密码，首次登录需强制修改
+            alphabet = string.ascii_letters + string.digits + "!@#$"
+            initial_password = ''.join(secrets.choice(alphabet) for _ in range(12))
             admin = User(
                 username="admin",
-                password_hash=hash_password("admin123"),
+                password_hash=hash_password(initial_password),
                 email="admin@example.com",
                 display_name="系统管理员",
                 role="admin",
                 team_id=admin_team.id,
+                must_change_password=True,
             )
             db.add(admin)
             db.commit()
             db.refresh(admin)
             admin_team.owner_id = admin.id
             db.commit()
-            print(f"[OK] 默认管理员已创建: admin / admin123")
+            print(f"[OK] 默认管理员已创建: admin / {initial_password} (首次登录需修改密码)")
         else:
             # 已有 admin 但没有 team_id，尝试创建默认团队
             if admin.team_id is None:
@@ -692,7 +641,8 @@ def init_db():
                     admin.team_id = team.id
                     db.commit()
 
-        # 每次启动都将未归属的数据归属到 admin（处理旧数据迁移和边缘情况）
+        # 将历史遗留的未归属数据（user_id IS NULL）归属到 admin，
+        # 注意：user_id = 0 表示"故意未分配"（用户主动解绑），不应再分配给 admin
         db.query(Lead).filter(Lead.user_id.is_(None)).update({Lead.user_id: admin.id})
         db.query(PlatformAccount).filter(PlatformAccount.user_id.is_(None)).update({PlatformAccount.user_id: admin.id})
         db.query(PlatformTask).filter(PlatformTask.user_id.is_(None)).update({PlatformTask.user_id: admin.id})

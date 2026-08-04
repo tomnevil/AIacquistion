@@ -10,7 +10,17 @@ venv/
 .env.local
 .env.production
 *.log
+*.rar
+*.zip
+*.tar.gz
 .DS_Store
 node_modules/
 browser_data/
 playwright/.cache/
+dist/
+build/
+*.egg-info/
+.coverage
+.pytest_cache/
+.mypy_cache/
+server_output.log
