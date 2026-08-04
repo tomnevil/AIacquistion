@@ -6,6 +6,7 @@ import uuid
 from contextlib import asynccontextmanager
 
 # 日志配置
+from config import settings
 from utils.logger import setup_logging
 app_logger = setup_logging(settings.LOG_LEVEL if hasattr(settings, "LOG_LEVEL") else "INFO")
 
