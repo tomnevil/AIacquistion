@@ -250,6 +250,130 @@ body::before {
 }
 .sidebar-item.active .nav-badge { background:rgba(255,255,255,0.25); color:#fff; }
 
+/* ── Sidebar Toggle Button ── */
+.sidebar-toggle {
+  display: flex;
+  background: rgba(255,255,255,0.15);
+  border: 1.5px solid rgba(255,255,255,0.3);
+  color: #fff;
+  font-size: 18px;
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  line-height: 1;
+  padding: 0;
+}
+.sidebar-toggle:hover {
+  background: rgba(255,255,255,0.28);
+  transform: scale(1.05);
+}
+
+/* ── Collapsed Sidebar (Desktop) ── */
+.sidebar.collapsed {
+  width: 64px; min-width: 64px;
+}
+.sidebar.collapsed .sidebar-logo,
+.sidebar.collapsed .sidebar-section-title,
+.sidebar.collapsed .sidebar-item span:not(.nav-icon),
+.sidebar.collapsed .sidebar-item .nav-badge {
+  display: none;
+}
+.sidebar.collapsed .sidebar-item {
+  justify-content: center;
+  padding: 12px 0;
+  margin: 3px 10px;
+  width: auto;
+}
+.sidebar.collapsed .sidebar-item:hover {
+  transform: none;
+}
+.sidebar.collapsed .sidebar-item .nav-icon {
+  font-size: 22px; width: auto;
+}
+
+/* ── Sidebar Overlay (Mobile) ── */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 40;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.sidebar-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── Mobile Responsive ── */
+@media (max-width: 768px) {
+  .header-new { padding: 0 14px; }
+  .header-new-left { font-size: 14px; gap: 8px; }
+  .header-new-left::before { font-size: 16px; }
+  .header-new-right { gap: 6px; }
+  .header-new-right .header-user-info { display: none; }
+  .header-new-right .btn { padding: 6px 10px; font-size: 12px; }
+
+  .sidebar {
+    position: fixed;
+    top: 60px; left: 0; bottom: 0;
+    z-index: 45;
+    width: 260px; min-width: 260px;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    box-shadow: 4px 0 30px rgba(0,0,0,0.2);
+    border-radius: 0;
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  .sidebar.collapsed {
+    display: none;
+  }
+
+  .sidebar-overlay {
+    display: block;
+  }
+
+  .container {
+    margin-left: 0 !important;
+  }
+  .main-content {
+    padding: 12px 14px;
+    width: 100%;
+  }
+
+  .dash-grid {
+    grid-template-columns: 1fr;
+  }
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* 发布工作台移动端适配 */
+  .publish-workspace {
+    flex-direction: column;
+  }
+  .publish-sidebar-v2, .publish-sidebar {
+    width: 100%; min-width: 100%;
+  }
+  .publish-main-v2 {
+    width: 100%;
+  }
+
+  /* 表格滚动 */
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 /* Stats */
 .stats { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:14px; margin-bottom:16px; }
 .dash-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px; margin-bottom:20px; }
@@ -1383,7 +1507,10 @@ a:hover { text-decoration:underline; }
 <div id="appMain" style="display:none">
 
 <div class="header-new">
-  <div class="header-new-left">AI 获客系统</div>
+  <div class="header-new-left">
+    <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="收起/展开侧边栏">☰</button>
+    AI 获客系统
+  </div>
   <div class="header-new-right">
     <div class="header-user-info" id="headerUser">👤 未登录</div>
     <button class="btn btn-outline btn-sm" onclick="getAISuggestion()">AI策略建议</button>
@@ -1476,6 +1603,9 @@ a:hover { text-decoration:underline; }
       </button>
     </div>
   </nav>
+
+  <!-- 移动端侧边栏遮罩 -->
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeMobileSidebar()"></div>
 
   <!-- 主内容区 -->
   <div class="main-content">
@@ -2944,6 +3074,7 @@ function showApp() {
     document.getElementById('ownerTh').style.display = '';
   }
   init();
+  initSidebar();
 }
 
 // ── 检查自动登录 ──
@@ -3063,6 +3194,8 @@ function switchTabSidebar(tab, el) {
     var div = document.getElementById('tab-'+t);
     if (div) div.style.display = t===tab ? 'block' : 'none';
   });
+  // 移动端点击菜单项后自动关闭侧边栏
+  if (window.innerWidth <= 768) closeMobileSidebar();
   if(tab==='dashboard') { loadDashboardData(); }
   else if(tab==='accounts') loadAccounts();
   else if(tab==='tasks') { loadTasks(); loadAccountOptions(); }
@@ -3081,6 +3214,86 @@ function switchTabSidebar(tab, el) {
   else if(tab==='optimization') { loadOptimizationReport(); }
   else if(tab==='competitor') { loadCompetitorPage(); }
 }
+
+// ── Sidebar Toggle ──
+function isMobile() { return window.innerWidth <= 768; }
+
+function toggleSidebar() {
+  var sidebar = document.querySelector('.sidebar');
+  var toggle = document.getElementById('sidebarToggle');
+  var overlay = document.getElementById('sidebarOverlay');
+  
+  if (isMobile()) {
+    // 移动端：滑入/滑出覆盖模式
+    var isOpen = sidebar.classList.contains('open');
+    if (isOpen) {
+      closeMobileSidebar();
+    } else {
+      sidebar.classList.add('open');
+      overlay.classList.add('show');
+      toggle.innerHTML = '✕';
+      document.body.style.overflow = 'hidden';
+    }
+  } else {
+    // 桌面端：收起/展开图标模式
+    var collapsed = sidebar.classList.toggle('collapsed');
+    toggle.innerHTML = collapsed ? '☰' : '✕';
+    if (collapsed) {
+      try { localStorage.setItem('sidebar_collapsed', '1'); } catch(e) {}
+    } else {
+      try { localStorage.removeItem('sidebar_collapsed'); } catch(e) {}
+    }
+  }
+}
+
+function closeMobileSidebar() {
+  var sidebar = document.querySelector('.sidebar');
+  var overlay = document.getElementById('sidebarOverlay');
+  var toggle = document.getElementById('sidebarToggle');
+  sidebar.classList.remove('open');
+  overlay.classList.remove('show');
+  toggle.innerHTML = '☰';
+  document.body.style.overflow = '';
+}
+
+// 初始化侧边栏状态
+function initSidebar() {
+  var sidebar = document.querySelector('.sidebar');
+  var toggle = document.getElementById('sidebarToggle');
+  // 桌面端恢复收起状态
+  if (!isMobile()) {
+    try {
+      if (localStorage.getItem('sidebar_collapsed') === '1') {
+        sidebar.classList.add('collapsed');
+        toggle.innerHTML = '☰';
+      }
+    } catch(e) {}
+  }
+}
+
+// 窗口大小变化时重置移动端/桌面端状态
+var _sidebarResizeTimer;
+window.addEventListener('resize', function() {
+  clearTimeout(_sidebarResizeTimer);
+  _sidebarResizeTimer = setTimeout(function() {
+    var sidebar = document.querySelector('.sidebar');
+    var overlay = document.getElementById('sidebarOverlay');
+    if (!isMobile()) {
+      // 从移动端切换到桌面端：移除移动端状态
+      sidebar.classList.remove('open');
+      overlay.classList.remove('show');
+      document.body.style.overflow = '';
+      // 不自动恢复/改变桌面端折叠状态
+    } else {
+      // 从桌面端切换到移动端：始终关闭
+      sidebar.classList.remove('collapsed');
+      sidebar.classList.remove('open');
+      overlay.classList.remove('show');
+      document.body.style.overflow = '';
+    }
+    document.getElementById('sidebarToggle').innerHTML = '☰';
+  }, 200);
+});
 
 // ════════════════════════════════════════
 // 统计
