@@ -38,7 +38,6 @@ def sample_account(db_session, sample_user):
     a = PlatformAccount(
         platform="weibo",
         account_name="test_account",
-        account_id="abc123",
         user_id=sample_user.id,
         status="active",
     )

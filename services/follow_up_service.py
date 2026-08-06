@@ -9,6 +9,9 @@ from database import (
 )
 from config import settings
 from services.ai_service import AIService
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 # ── 线索旅程阶段定义 ──
@@ -90,11 +93,23 @@ class FollowUpService:
                 lead.sla_deadline = datetime.utcnow() + timedelta(hours=sla_hours)
                 lead.sla_hours = sla_hours
 
-            # 如果成交，记录转化时间
+            # 如果成交，记录转化时间 + 触发全链路归因
             if target_stage == "converted":
                 lead.conversion_date = datetime.utcnow()
 
             db.commit()
+
+            # P1-5: 记录旅程事件 + 成交时触发全链路归因
+            try:
+                from services.attribution_service import record_journey_event, attribute_full_chain
+                stage_name = JOURNEY_STAGES.get(target_stage, {}).get("name", target_stage)
+                record_journey_event(lead, target_stage, f"转换到「{stage_name}」")
+                if target_stage == "converted":
+                    attribute_full_chain(lead_id, db)
+            except Exception as e:
+                # 旅程事件失败不影响主流程
+                pass
+
             return {"success": True, "message": f"已转换到 {JOURNEY_STAGES[target_stage]['name']}"}
         except Exception as e:
             if own_db:
@@ -111,7 +126,7 @@ class FollowUpService:
             "new": LeadStatus.NEW.value,
             "contacted": LeadStatus.CONTACTED.value,
             "qualified": LeadStatus.QUALIFIED.value,
-            "quoted": LeadStatus.SCORED.value,
+            "quoted": LeadStatus.QUOTED.value,
             "converted": LeadStatus.CONVERTED.value,
             "lost": LeadStatus.LOST.value,
         }
@@ -159,7 +174,7 @@ class FollowUpService:
         except Exception as e:
             if own_db:
                 db.rollback()
-            print(f"[FollowUp] 创建跟进计划失败: {e}")
+            logger.error(f"[FollowUp] 创建跟进计划失败: {e}")
             return []
         finally:
             if own_db:
@@ -203,7 +218,7 @@ class FollowUpService:
             content = await AIService._call_ai(system, user)
             return content.strip()
         except Exception as e:
-            print(f"[FollowUp] AI 生成跟进内容失败: {e}")
+            logger.error(f"[FollowUp] AI 生成跟进内容失败: {e}")
             return ""
         finally:
             if own_db:

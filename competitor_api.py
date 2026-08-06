@@ -4,9 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
-from database import get_db, User
+from database import get_db, User, CompetitorAccount
 from services.competitor_service import competitor_service
-from services.auth_service import get_current_user, require_permission
+from services.auth_service import (
+    get_current_user, require_role, own_or_admin,
+)
 
 router = APIRouter(prefix="/api/competitor", tags=["竞争情报"])
 
@@ -35,10 +37,23 @@ class GenerateReportRequest(BaseModel):
 
 # ── API 端点 ──
 
+# ── 辅助：归属校验 ──
+
+def _get_competitor_or_403(competitor_id: int, user: User, db: Session) -> CompetitorAccount:
+    comp = db.query(CompetitorAccount).filter(CompetitorAccount.id == competitor_id).first()
+    if not comp:
+        raise HTTPException(status_code=404, detail="竞品不存在")
+    if not own_or_admin(user, comp.user_id):
+        raise HTTPException(status_code=403, detail="无权访问此竞品")
+    return comp
+
+
+# ── API 端点 ──
+
 @router.post("/accounts")
 async def add_competitor(
     req: AddCompetitorRequest,
-    user: User = Depends(require_permission("editor")),
+    user: User = Depends(require_role("editor")),
 ):
     """添加竞品账号"""
     comp = competitor_service.add_competitor(
@@ -68,9 +83,11 @@ async def list_competitors(
 @router.delete("/accounts/{competitor_id}")
 async def remove_competitor(
     competitor_id: int,
-    user: User = Depends(require_permission("editor")),
+    user: User = Depends(require_role("editor")),
+    db: Session = Depends(get_db),
 ):
     """移除竞品账号"""
+    _get_competitor_or_403(competitor_id, user, db)
     success = competitor_service.remove_competitor(
         competitor_id,
         user_id=None if user.role == "admin" else user.id,
@@ -83,11 +100,14 @@ async def remove_competitor(
 @router.post("/fetch-content")
 async def fetch_competitor_content(
     req: FetchContentRequest,
-    user: User = Depends(require_permission("editor")),
+    user: User = Depends(require_role("editor")),
     db: Session = Depends(get_db),
 ):
     """抓取竞品内容"""
     if req.competitor_ids:
+        # 校验每个 ID 的归属
+        for cid in req.competitor_ids:
+            _get_competitor_or_403(cid, user, db)
         comp_ids = req.competitor_ids
     else:
         comps = competitor_service.list_competitors(
@@ -119,7 +139,7 @@ async def analyze_content_gap(
 @router.post("/weekly-report")
 async def generate_weekly_report(
     req: GenerateReportRequest,
-    user: User = Depends(require_permission("manager")),
+    user: User = Depends(require_role("manager")),
 ):
     """生成周报"""
     report = await competitor_service.generate_weekly_report(

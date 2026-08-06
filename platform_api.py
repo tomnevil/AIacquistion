@@ -2297,9 +2297,16 @@ def analytics_works(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    SORT_WHITELIST = {"published_at", "views", "likes", "comments", "shares", "bookmarks"}
-    if sort not in SORT_WHITELIST:
-        raise HTTPException(400, f"Invalid sort field. Allowed: {', '.join(sorted(SORT_WHITELIST))}")
+    SORT_MAP = {
+        "published_at": ContentPerformance.published_at,
+        "views": ContentPerformance.views,
+        "likes": ContentPerformance.likes,
+        "comments": ContentPerformance.comments,
+        "shares": ContentPerformance.shares,
+        "bookmarks": ContentPerformance.bookmarks,
+    }
+    if sort not in SORT_MAP:
+        raise HTTPException(400, f"Invalid sort field. Allowed: {', '.join(sorted(SORT_MAP.keys()))}")
     if order not in ("asc", "desc"):
         raise HTTPException(400, "Invalid order. Use 'asc' or 'desc'")
     s, e = _parse_date_range(start_date, end_date, default_days=30)
@@ -2314,7 +2321,7 @@ def analytics_works(
         q = q.filter(ContentPerformance.title.contains(keyword))
 
     total = q.count()
-    sort_col = getattr(ContentPerformance, sort, ContentPerformance.published_at)
+    sort_col = SORT_MAP[sort]
     q = q.order_by(sort_col.desc() if order == "desc" else sort_col.asc())
     rows = q.offset((page - 1) * page_size).limit(page_size).all()
 

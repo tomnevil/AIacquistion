@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>JavaScript Debug Test</title>
+</head>
+<body>
+    <h1>JavaScript Debug Test</h1>
+    
+    <button onclick="testBasicSwitch()">Basic Tab Switch Test</button>
+    <button onclick="testAdvancedSwitch()">Advanced Tab Switch Test</button>
+    
+    <div id="tab-export" style="display:none;background:#e0f7fa;padding:20px;margin:10px 0;border:1px solid #00bcd4;">
+        <h2>📤 数据导出</h2>
+        <p>数据导出页面内容</p>
+        <button onclick="console.log('Export button clicked')">导出线索 (CSV)</button>
+    </div>
+
+    <div id="tab-backup" style="display:none;background:#fff3e0;padding:20px;margin:10px 0;border:1px solid #ff9800;">
+        <h2>💾 数据备份</h2>
+        <p>数据备份页面内容</p>
+        <button onclick="console.log('Backup button clicked')">立即备份</button>
+    </div>
+
+    <script>
+        console.log('Debug page loaded');
+        
+        function testBasicSwitch() {
+            console.log('=== Basic Test Started ===');
+            
+            try {
+                // 测试基本元素选择
+                var exportDiv = document.getElementById('tab-export');
+                var backupDiv = document.getElementById('tab-backup');
+                
+                console.log('exportDiv found:', !!exportDiv);
+                console.log('backupDiv found:', !!backupDiv);
+                
+                if (exportDiv && backupDiv) {
+                    console.log('Elements found successfully');
+                    exportDiv.style.display = 'block';
+                    backupDiv.style.display = 'none';
+                    console.log('Display set successfully');
+                } else {
+                    console.log('Elements not found');
+                }
+            } catch (e) {
+                console.error('Basic test error:', e);
+            }
+            
+            console.log('=== Basic Test Ended ===');
+        }
+        
+        function testAdvancedSwitch() {
+            console.log('=== Advanced Test Started ===');
+            
+            try {
+                // 模拟原始的switchTabSidebar函数
+                function switchTabSidebar(tab, el) {
+                    console.log('switchTabSidebar called with:', tab);
+                    
+                    var tabs = ['export', 'backup'];
+                    tabs.forEach(function(t) {
+                        var div = document.getElementById('tab-' + t);
+                        if (div) {
+                            console.log('Processing tab:', t);
+                            div.style.display = t === tab ? 'block' : 'none';
+                        } else {
+                            console.log('Tab not found:', 'tab-' + t);
+                        }
+                    });
+                    
+                    console.log('Tab switch completed for:', tab);
+                }
+                
+                // 测试导出页面
+                console.log('Testing export tab...');
+                switchTabSidebar('export', null);
+                
+                setTimeout(function() {
+                    // 测试备份页面
+                    console.log('Testing backup tab...');
+                    switchTabSidebar('backup', null);
+                    
+                    setTimeout(function() {
+                        console.log('=== Advanced Test Completed Successfully ===');
+                    }, 500);
+                }, 500);
+                
+            } catch (e) {
+                console.error('Advanced test error:', e);
+            }
+        }
+    </script>
+</body>
+</html>

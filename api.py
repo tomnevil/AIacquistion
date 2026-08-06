@@ -309,17 +309,24 @@ async def get_strategy(db: Session = Depends(get_db), current_user: User = Depen
 def get_stats(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """获取统计摘要 + 转化漏斗 + 平台对比"""
     base_q = _filter_by_user(db.query(Lead), Lead, current_user)
-    total = base_q.count()
-    statuses = {}
-    for status in LeadStatus:
-        count = base_q.filter(Lead.status == status.value).count()
-        if count > 0:
-            statuses[status.value] = count
 
+    # ── 单次聚合查询：status + intent 统计 ──
+    status_rows = base_q.with_entities(
+        Lead.status, func.count(Lead.id)
+    ).group_by(Lead.status).all()
+    statuses = {s: c for s, c in status_rows if c > 0}
+
+    intent_rows = base_q.with_entities(
+        Lead.ai_intent, func.count(Lead.id)
+    ).filter(
+        Lead.ai_intent.in_(["high", "medium", "low"])
+    ).group_by(Lead.ai_intent).all()
     intents = {"high": 0, "medium": 0, "low": 0}
-    for intent in intents:
-        intents[intent] = base_q.filter(Lead.ai_intent == intent).count()
+    for intent, cnt in intent_rows:
+        if intent in intents:
+            intents[intent] = cnt
 
+    total = base_q.count()
     avg_score = base_q.filter(Lead.ai_score > 0).count()
     avg_score_val = base_q.with_entities(func.avg(Lead.ai_score)).scalar() or 0
 

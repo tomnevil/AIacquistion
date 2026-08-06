@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>测试页面显示</title>
+    <style>
+        .tab { display: none; padding: 20px; border: 1px solid #ddd; margin: 10px 0; }
+        .active { display: block !important; }
+    </style>
+</head>
+<body>
+    <h1>测试页面显示功能</h1>
+    
+    <button onclick="switchTab('export')">显示导出页面</button>
+    <button onclick="switchTab('backup')">显示备份页面</button>
+    
+    <div id="tab-export" class="tab" style="display:none">
+        <h2>📤 数据导出</h2>
+        <div style="padding: 20px; border: 1px solid #ccc; margin: 10px 0;">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+                <div style="font-size:24px">🎯</div>
+                <div>
+                    <div style="font-weight:700;color:#0F172A">线索数据</div>
+                    <div style="font-size:12px;color:#64748B">客户信息、评分、转化记录</div>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button onclick="alert('CSV 导出')">📄 CSV</button>
+                <button onclick="alert('Excel 导出')">📊 Excel</button>
+                <button onclick="alert('PDF 导出')">📋 PDF</button>
+            </div>
+            <div style="margin-top:12px">
+                <label>
+                    <input type="checkbox" id="exportLeadsSelected" onchange="console.log('切换选择')"> 仅导出选中线索
+                </label>
+            </div>
+        </div>
+        <p>导出页面内容显示正常！</p>
+    </div>
+
+    <div id="tab-backup" class="tab" style="display:none">
+        <h2>💾 数据备份</h2>
+        <div style="padding: 20px; border: 1px solid #ccc; margin: 10px 0;">
+            <div>
+                <label>启用自动备份</label>
+                <input type="checkbox" id="backupEnabled" onchange="console.log('更新配置')">
+            </div>
+            <div>
+                <label>备份时间</label>
+                <input type="time" id="backupTime" value="02:00" onchange="console.log('更新配置')">
+            </div>
+            <div>
+                <label>备份频率</label>
+                <select id="backupFrequency" onchange="console.log('更新配置')">
+                    <option value="7">每周</option>
+                    <option value="30">每月</option>
+                </select>
+            </div>
+            <div>
+                <label>保留天数</label>
+                <select id="backupRetention" onchange="console.log('更新配置')">
+                    <option value="30">30天</option>
+                    <option value="90">90天</option>
+                </select>
+            </div>
+            <button onclick="alert('手动备份')">🔄 立即备份</button>
+        </div>
+        <p>备份页面内容显示正常！</p>
+    </div>
+
+    <script>
+        function switchTab(tab) {
+            console.log('切换到:', tab);
+            
+            try {
+                // 隐藏所有标签页
+                var tabs = ['export', 'backup'];
+                tabs.forEach(function(t) {
+                    var div = document.getElementById('tab-' + t);
+                    if (div) {
+                        console.log('隐藏:', 'tab-' + t);
+                        div.style.display = 'none';
+                    } else {
+                        console.log('找不到元素:', 'tab-' + t);
+                    }
+                });
+                
+                // 显示选中的标签页
+                var selectedDiv = document.getElementById('tab-' + tab);
+                if (selectedDiv) {
+                    console.log('显示:', 'tab-' + tab);
+                    selectedDiv.style.display = 'block';
+                } else {
+                    console.log('找不到选中的元素:', 'tab-' + tab);
+                }
+            } catch (e) {
+                console.error('切换标签页时出错:', e);
+            }
+        }
+    </script>
+
+    <p>点击上面的按钮测试页面切换功能。</p>
+</body>
+</html>

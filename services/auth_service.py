@@ -75,7 +75,12 @@ async def get_current_user(
     if not user_id:
         raise HTTPException(status_code=401, detail="无效的登录凭证")
 
-    user = db.query(User).filter(User.id == int(user_id), User.is_active == True).first()
+    try:
+        uid = int(user_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=401, detail="无效的登录凭证")
+
+    user = db.query(User).filter(User.id == uid, User.is_active == True).first()
     if not user:
         raise HTTPException(status_code=401, detail="用户不存在或已禁用")
 
@@ -100,8 +105,7 @@ async def get_optional_user(
 # ════════════════════════════════════════
 
 def has_permission(user: User, permission: str) -> bool:
-    """检查用户是否具有某项权限或更高角色"""
-    from config import settings
+    """检查用户是否具有某项具体权限"""
     perm_map = {
         "admin":   ["manage_system", "manage_users", "manage_team", "approve_content", "edit_content", "view_data", "export_data"],
         "manager": ["manage_team", "approve_content", "edit_content", "view_data", "export_data"],
@@ -109,23 +113,32 @@ def has_permission(user: User, permission: str) -> bool:
         "viewer":  ["view_data"],
     }
     allowed = perm_map.get(user.role, ["view_data"])
-    # 先检查具体权限名
-    if permission in allowed:
-        return True
-    # 如果 permission 是角色名，则用层级检查（admin > manager > editor > viewer）
+    return permission in allowed
+
+
+def has_role(user: User, required_role: str) -> bool:
+    """检查用户是否具有指定角色或更高角色"""
+    from config import settings
     role_hierarchy = settings.ROLE_HIERARCHY
-    if permission in role_hierarchy:
-        user_level = role_hierarchy.get(user.role, 0)
-        required_level = role_hierarchy.get(permission, 0)
-        return user_level >= required_level
-    return False
+    user_level = role_hierarchy.get(user.role, 0)
+    required_level = role_hierarchy.get(required_role, 0)
+    return user_level >= required_level
 
 
 def require_permission(permission: str):
-    """返回一个 FastAPI 依赖，要求当前用户具有指定权限"""
+    """要求当前用户具有指定具体权限（如 approve_content, edit_content）"""
     async def _check(current_user: User = Depends(get_current_user)):
         if not has_permission(current_user, permission):
             raise HTTPException(403, f"权限不足，需要 {permission}")
+        return current_user
+    return _check
+
+
+def require_role(role: str):
+    """要求当前用户具有指定角色或更高角色（如 editor 表示 editor 及以上）"""
+    async def _check(current_user: User = Depends(get_current_user)):
+        if not has_role(current_user, role):
+            raise HTTPException(403, f"角色不足，需要 {role} 或更高")
         return current_user
     return _check
 
@@ -148,3 +161,28 @@ def can_manage_user(user: User, target_user) -> bool:
     if not user.team_id or user.team_id != target_user.team_id:
         return False
     return get_role_level(user.role) > get_role_level(target_user.role)
+
+
+# ════════════════════════════════════════
+#  数据归属校验工具（防 IDOR）
+# ════════════════════════════════════════
+
+def own_or_admin(current_user: User, owner_id: int) -> bool:
+    """判断当前用户是否为资源所有者或管理员"""
+    if current_user.role == "admin":
+        return True
+    return current_user.id == owner_id
+
+
+def filter_by_owner(current_user: User, query, model, column_name: str = "user_id"):
+    """对查询添加归属过滤（admin 看全部，其他人只看自己的）"""
+    if current_user.role != "admin":
+        col = getattr(model, column_name)
+        return query.filter(col == current_user.id)
+    return query
+
+
+async def require_ownership(current_user: User, owner_id: int, resource_name: str = "资源"):
+    """FastAPI 依赖风格的归属校验，403 if not owner and not admin"""
+    if not own_or_admin(current_user, owner_id):
+        raise HTTPException(403, f"无权访问此{resource_name}")

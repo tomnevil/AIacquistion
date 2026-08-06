@@ -96,6 +96,7 @@ class LeadStatus(str, enum.Enum):
     CONTACTED = "contacted"  # 已触达
     RESPONDED = "responded"  # 已回复
     QUALIFIED = "qualified"  # 已合格
+    QUOTED = "quoted"        # 已报价
     LOST = "lost"            # 已流失
     CONVERTED = "converted"  # 已转化
 
@@ -138,6 +139,20 @@ class Lead(Base):
     loss_reason = Column(String(200), default="")       # 流失原因
     attribution_task_id = Column(Integer, nullable=True)  # 归因来源的平台任务
     attribution_content_id = Column(Integer, nullable=True)  # 归因来源的内容
+
+    # P1-5: 全链路归因扩展 — 热点→内容→评论→私信→加好友→成交
+    attribution_topic_id = Column(Integer, nullable=True)       # 热点归因
+    attribution_comment_id = Column(Integer, nullable=True)     # 评论归因（评论收件箱ID）
+    attribution_account_id = Column(Integer, nullable=True)     # 账号归因（PlatformAccount ID）
+    attribution_channel = Column(String(50), default="")        # 归因渠道 weibo/zhihu/douyin/...
+
+    # 加好友（私域承接最后一公里）
+    friend_added = Column(Boolean, default=False)               # 是否已加好友
+    friend_added_at = Column(DateTime, nullable=True)           # 加好友时间
+    friend_added_via = Column(String(50), default="")           # 加好友渠道：wechat_work/comment_dm/email
+
+    # 旅程事件时间线（JSON 数组：[{event, ts, note}]）
+    journey_events = Column(Text, default="[]")
 
     # 自定义字段 (JSON)
     extra_data = Column(Text, default="{}")
@@ -223,26 +238,84 @@ class PlatformTask(Base):
 
     lead_id = Column(Integer, nullable=True)
 
+    # P1-7: A/B 效果追踪 — 记录任务使用的素材模板/变体 ID
+    source_template_id = Column(Integer, nullable=True, index=True)
+
     scheduled_at = Column(DateTime, nullable=True)
     executed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class ContentLibrary(Base):
-    """内容素材库"""
+    """内容素材库 — P1-7 升级为团队资产（版本管理 + A/B 测试 + 模板市场）"""
     __tablename__ = "content_library"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, nullable=True, index=True)  # 所属用户
+    user_id = Column(Integer, nullable=True, index=True)  # 所属用户；市场模板为 NULL
     platform = Column(String(30), nullable=False)
     category = Column(String(50), default=settings.DEFAULT_TEMPLATE_CATEGORY)
     template = Column(Text, nullable=False)
     tags = Column(Text, default="")
-    usage_count = Column(Integer, default=0)
-    success_rate = Column(Integer, default=0)
+    usage_count = Column(Integer, default=0)       # 使用次数（发送数）
+    success_rate = Column(Integer, default=0)       # 历史成功率（百分比）
     is_ai_generated = Column(Boolean, default=False)
-    status = Column(String(20), default="active")  # active / draft / rejected
+    status = Column(String(20), default="active")  # active / draft / rejected / archived
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # P1-7: 版本管理
+    version = Column(Integer, default=1)                       # 当前版本号
+    changed_by = Column(Integer, nullable=True)                # 最后修改人 ID
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # P1-7: A/B 变体 — 变体通过 base_template_id 指向父模板
+    base_template_id = Column(Integer, nullable=True, index=True)  # 父模板ID（NULL=独立模板/父模板本身）
+    variant_label = Column(String(20), default="")             # 变体标签 A/B/C
+    ab_test_count = Column(Integer, default=0)                 # 参与 A/B 测试次数（发送数）
+    reply_count = Column(Integer, default=0)                   # 收到回复数
+    lead_count = Column(Integer, default=0)                    # 带来线索数
+    converted_count = Column(Integer, default=0)               # 成交数
+
+    # P1-7: 模板市场
+    is_market_template = Column(Boolean, default=False)        # 是否发布到模板市场
+    industry = Column(String(50), default="通用")              # 行业分类（电商/企服/教育/本地生活...）
+    market_category = Column(String(50), default="")           # 市场二级分类
+    fork_count = Column(Integer, default=0)                    # 被fork次数
+
+
+class ContentVersion(Base):
+    """素材版本记录 — 每次修改保存快照，支持回滚"""
+    __tablename__ = "content_versions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    template_id = Column(Integer, nullable=False, index=True)     # 关联模板
+    version_number = Column(Integer, nullable=False)              # 版本号
+    content_snapshot = Column(Text, nullable=False)               # 内容快照
+    tags_snapshot = Column(Text, default="")                      # 标签快照
+    category_snapshot = Column(String(50), default="")            # 分类快照
+    change_note = Column(String(500), default="")                 # 变更说明
+    changed_by = Column(Integer, nullable=True)                   # 修改人 ID
+    changed_by_name = Column(String(100), default="")             # 修改人姓名
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ContentABTest(Base):
+    """A/B 测试执行记录 — 每次任务发送追踪回复/线索/成交结果"""
+    __tablename__ = "content_ab_tests"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True, index=True)
+    test_name = Column(String(200), default="")                   # 测试名称
+    base_template_id = Column(Integer, nullable=False, index=True)   # 基础模板
+    variant_template_id = Column(Integer, nullable=False, index=True)  # 变体模板
+    task_id = Column(Integer, nullable=True, index=True)          # 关联任务
+    platform = Column(String(30), default="")
+    account_id = Column(Integer, nullable=True)
+    sent_at = Column(DateTime, default=datetime.utcnow)
+    replied = Column(Boolean, default=False)
+    replied_at = Column(DateTime, nullable=True)
+    lead_generated = Column(Boolean, default=False)
+    converted = Column(Boolean, default=False)
+    note = Column(String(500), default="")
 
 
 class Team(Base):
@@ -692,6 +765,384 @@ class ContentPerformance(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+# ── PRD P1-4：自动化工作流引擎 ──
+
+class Workflow(Base):
+    """自动化工作流 — 事件驱动的获客流水线"""
+    __tablename__ = "workflows"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True, index=True)
+    name = Column(String(200), nullable=False)
+    description = Column(Text, default="")
+
+    # 触发器配置
+    trigger_type = Column(String(50), nullable=False)   # comment_keyword / lead_created / topic_scored_high / scheduled
+    trigger_config = Column(Text, default="{}")          # JSON: 触发条件配置（关键词、阈值等）
+
+    # 状态
+    is_active = Column(Boolean, default=True, index=True)
+    priority = Column(Integer, default=0)                # 多个工作流同时命中时，按优先级排序
+
+    # 执行统计
+    trigger_count = Column(Integer, default=0)           # 累计触发次数
+    success_count = Column(Integer, default=0)           # 累计成功次数
+    failed_count = Column(Integer, default=0)            # 累计失败次数
+    last_triggered_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class WorkflowNode(Base):
+    """工作流节点 — 串联的动作步骤"""
+    __tablename__ = "workflow_nodes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    workflow_id = Column(Integer, nullable=False, index=True)
+
+    sequence = Column(Integer, default=0)                # 执行顺序
+    node_type = Column(String(50), nullable=False)       # action / condition / delay
+    action_type = Column(String(50), default="")         # generate_reply / create_lead / assign_owner / create_followup / send_notification / wait
+    config = Column(Text, default="{}")                  # JSON: 节点配置（参数）
+
+    # 条件节点专用
+    condition_field = Column(String(100), default="")    # 检查的字段
+    condition_op = Column(String(20), default="eq")      # eq/ne/contains/gt/lt
+    condition_value = Column(Text, default="")           # 比较值
+
+    # 延时节点专用
+    delay_seconds = Column(Integer, default=0)           # 延迟秒数
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class WorkflowExecutionLog(Base):
+    """工作流执行日志 — 每次触发的详细记录"""
+    __tablename__ = "workflow_execution_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    workflow_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(Integer, nullable=True)
+
+    # 触发上下文
+    trigger_type = Column(String(50), default="")
+    trigger_resource_type = Column(String(50), default="")  # comment / lead / topic
+    trigger_resource_id = Column(Integer, nullable=True)
+
+    # 执行状态
+    status = Column(String(20), default="running")      # running / success / failed / partial
+    current_node = Column(Integer, default=0)            # 当前执行到第几步
+    error_message = Column(Text, default="")
+    execution_result = Column(Text, default="{}")        # JSON: 各步骤执行结果
+
+    started_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+
+
+# ════════════════════════════════════════════════════════════════
+# PRD P2-8：AI 运营智能体（Agent）— 7×24 自动获客团队
+# 在风控阈值内全自动跑"发现→生成→执行→跟进"，异常才升级人工
+# ════════════════════════════════════════════════════════════════
+
+class Agent(Base):
+    """AI 运营 Agent 配置 — 宏循环编排器，复用既有 service 跑四阶段闭环"""
+    __tablename__ = "agents"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True, index=True)
+    name = Column(String(200), nullable=False)
+    description = Column(Text, default="")
+
+    # 运行模式：auto_pilot 全自动(异常才升级) / approval_required 生成后审批 / paused 暂停
+    mode = Column(String(30), default="approval_required")
+
+    # 调度：每 N 分钟跑一次
+    interval_minutes = Column(Integer, default=60)
+    last_run_at = Column(DateTime, nullable=True)
+    next_run_at = Column(DateTime, nullable=True)
+    is_active = Column(Boolean, default=False, index=True)
+
+    # 阶段开关
+    stage_discover = Column(Boolean, default=True)
+    stage_generate = Column(Boolean, default=True)
+    stage_execute = Column(Boolean, default=True)
+    stage_followup = Column(Boolean, default=True)
+
+    # 阈值
+    min_hot_score = Column(Float, default=60.0)           # 发现：最低热点分
+    max_topics_per_run = Column(Integer, default=5)       # 发现：每次最多取 N 个
+    max_publish_per_run = Column(Integer, default=3)      # 执行：每次最多创建 N 个任务
+    max_followups_per_run = Column(Integer, default=10)   # 跟进：每次最多处理 N 条
+
+    # 目标平台（JSON 数组，空=全部支持的平台）
+    target_platforms = Column(Text, default="[]")
+
+    # 风控阈值
+    auto_publish_enabled = Column(Boolean, default=False)  # 是否自动发布（否则入审批队列）
+    daily_publish_cap = Column(Integer, default=5)           # 每日全账号发布上限
+
+    # 通知 webhook（飞书/企微/钉钉），空=不发
+    webhook_url = Column(String(500), default="")
+
+    # 统计
+    total_runs = Column(Integer, default=0)
+    total_auto = Column(Integer, default=0)
+    total_escalated = Column(Integer, default=0)
+    last_run_status = Column(String(20), default="")
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AgentRun(Base):
+    """Agent 单次运行记录 — 每次宏循环产生一条"""
+    __tablename__ = "agent_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    agent_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(Integer, nullable=True)
+
+    status = Column(String(20), default="running")  # running/success/partial/failed
+    mode = Column(String(30), default="")
+    trigger = Column(String(20), default="scheduled")  # scheduled/manual
+
+    # 各阶段汇总
+    discover_count = Column(Integer, default=0)
+    generate_count = Column(Integer, default=0)
+    execute_count = Column(Integer, default=0)
+    followup_count = Column(Integer, default=0)
+
+    auto_count = Column(Integer, default=0)        # 自动执行动作数
+    escalated_count = Column(Integer, default=0)   # 升级人工数
+    skipped_count = Column(Integer, default=0)     # 跳过数（风控拦截等）
+    error_message = Column(Text, default="")
+
+    started_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+
+
+class AgentDecision(Base):
+    """Agent 决策审计 — 每个动作的决策与理由，可追溯"""
+    __tablename__ = "agent_decisions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_id = Column(Integer, nullable=False, index=True)
+    agent_id = Column(Integer, nullable=False, index=True)
+
+    stage = Column(String(30), default="")         # discover/generate/execute/followup
+    action = Column(String(50), default="")         # fetch_topic/generate_content/create_task/transition_stage ...
+    resource_type = Column(String(50), default="")  # topic/content/task/lead/followup
+    resource_id = Column(Integer, nullable=True)
+
+    # 决策：auto 自动执行 / approve 入审批队列 / skip 跳过 / escalate 升级人工
+    decision = Column(String(20), default="auto")
+    reason = Column(String(500), default="")
+    payload = Column(Text, default="{}")            # JSON: 决策相关数据快照
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AgentApproval(Base):
+    """Agent 人工审批队列 — 异常或 approval_required 模式产生"""
+    __tablename__ = "agent_approvals"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    agent_id = Column(Integer, nullable=False, index=True)
+    run_id = Column(Integer, nullable=False, index=True)
+    decision_id = Column(Integer, nullable=True, index=True)
+
+    # 审批内容类型与预览
+    resource_type = Column(String(50), default="")  # task/content/followup
+    resource_id = Column(Integer, nullable=True)
+    title = Column(String(300), default="")
+    content_preview = Column(Text, default="")
+    payload = Column(Text, default="{}")            # JSON: 完整数据（审批通过后可回放执行）
+
+    # 风险标记
+    risk_level = Column(String(20), default="low")  # low/medium/high
+    risk_reason = Column(String(500), default="")
+
+    status = Column(String(20), default="pending", index=True)  # pending/approved/rejected
+    decided_by = Column(Integer, nullable=True)
+    decided_at = Column(DateTime, nullable=True)
+    decision_note = Column(String(500), default="")
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ════════════════════════════════════════════════════════════════
+# PRD P1-6：企微私域承接工作台
+# ════════════════════════════════════════════════════════════════
+
+class WeComAccount(Base):
+    """企业微信企业配置 — 对接「客户联系」API"""
+    __tablename__ = "wecom_accounts"
+
+    SENSITIVE_FIELDS = {"secret_encrypted"}
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True, index=True)
+    corp_name = Column(String(200), default="")              # 企业名称
+    corp_id = Column(String(100), nullable=False, index=True)  # 企业ID
+    agent_id = Column(Integer, default=0)                     # 应用ID
+    secret_encrypted = Column(String(500), default="")        # Secret（加密存储）
+    callback_token = Column(String(100), default="")          # 回调Token
+    callback_encoding_aes = Column(String(200), default="")   # 回调EncodingAESKey
+
+    # 状态
+    is_active = Column(Boolean, default=True)
+    last_synced_at = Column(DateTime, nullable=True)
+    contact_count = Column(Integer, default=0)                # 客户总数
+
+    extra_data = Column(Text, default="{}")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class WeComLiveCode(Base):
+    """企微活码 — 「联系我」二维码配置"""
+    __tablename__ = "wecom_live_codes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True, index=True)
+    wecom_account_id = Column(Integer, nullable=False, index=True)
+
+    name = Column(String(100), nullable=False)                # 活码名称
+    code_url = Column(Text, default="")                       # 二维码图片URL
+    code_config = Column(Text, default="{}")                  # 活码配置JSON（轮询用户/部门等）
+
+    # 关联
+    welcome_message_id = Column(Integer, nullable=True)       # 默认欢迎语ID
+    auto_tags = Column(Text, default="[]")                    # 扫码自动打标签 JSON
+
+    # 来源追踪（打通公域→私域）
+    source_platform = Column(String(30), default="")          # 来源平台 weibo/douyin/...
+    source_topic_id = Column(Integer, nullable=True)          # 来源热点选题
+    source_content_id = Column(Integer, nullable=True)        # 来源内容
+
+    # 统计
+    scan_count = Column(Integer, default=0)                   # 扫码次数
+    add_count = Column(Integer, default=0)                    # 添加好友数
+    last_scan_at = Column(DateTime, nullable=True)
+
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class WeComContact(Base):
+    """企微客户联系 — 加好友后的客户档案"""
+    __tablename__ = "wecom_contacts"
+    __table_args__ = (
+        UniqueConstraint('wecom_account_id', 'external_userid', name='uq_wecom_contact_external'),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True, index=True)
+    wecom_account_id = Column(Integer, nullable=False, index=True)
+
+    # 企微侧字段
+    external_userid = Column(String(200), nullable=False, index=True)  # 外部联系人ID
+    name = Column(String(200), default="")                    # 客户昵称
+    avatar = Column(Text, default="")                         # 头像URL
+    corp_name = Column(String(200), default="")               # 客户企业名
+    type = Column(Integer, default=0)                         # 0=普通客户 1=企业微信客户
+
+    # 归属
+    owner_userid = Column(String(100), default="")            # 归属成员（企微员工ID）
+
+    # 标签（JSON 数组）
+    tags = Column(Text, default="[]")                         # 标签名列表
+
+    # 来源追踪（打通归因链路）
+    source_platform = Column(String(30), default="")          # 来源平台
+    source_live_code_id = Column(Integer, nullable=True)      # 来源活码
+    source_topic_id = Column(Integer, nullable=True)          # 来源热点
+    source_lead_id = Column(Integer, nullable=True, index=True)  # 关联线索ID
+
+    # 状态
+    friend_added_at = Column(DateTime, default=datetime.utcnow)  # 加好友时间
+    last_active_at = Column(DateTime, nullable=True)          # 最后活跃时间
+    is_lost = Column(Boolean, default=False)                  # 是否流失（删除好友）
+
+    extra_data = Column(Text, default="{}")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class WeComWelcomeMessage(Base):
+    """企微欢迎语配置 — 加好友后自动发送"""
+    __tablename__ = "wecom_welcome_messages"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True, index=True)
+
+    name = Column(String(100), nullable=False)                # 欢迎语名称
+    content = Column(Text, nullable=False)                    # 文本内容
+    media_type = Column(String(20), default="text")           # text/image/link/miniprogram
+    media_url = Column(Text, default="")                      # 素材URL
+    media_title = Column(String(200), default="")             # 链接/小程序标题
+    media_desc = Column(Text, default="")                     # 链接/小程序描述
+
+    # 触发条件
+    trigger_tags = Column(Text, default="[]")                 # 命中标签时触发（空=默认）
+    trigger_source = Column(String(30), default="")           # 来源平台触发
+    priority = Column(Integer, default=0)                     # 优先级（高优先级先匹配）
+
+    is_active = Column(Boolean, default=True)
+    use_count = Column(Integer, default=0)                    # 使用次数
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class WeComTag(Base):
+    """企微标签 — 自动打标规则"""
+    __tablename__ = "wecom_tags"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True, index=True)
+    wecom_account_id = Column(Integer, nullable=False, index=True)
+
+    name = Column(String(100), nullable=False)                # 标签名
+    color = Column(String(20), default="#6366f1")             # 标签颜色
+    description = Column(Text, default="")
+
+    # 自动打标规则（JSON: [{field, op, value}]）
+    auto_rule = Column(Text, default="{}")                    # 自动打标规则
+    contact_count = Column(Integer, default=0)                # 关联客户数
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class WeComMassMessage(Base):
+    """企微群发 — 素材群发到客户"""
+    __tablename__ = "wecom_mass_messages"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True, index=True)
+    wecom_account_id = Column(Integer, nullable=False, index=True)
+
+    title = Column(String(200), default="")                   # 群发任务名称
+    content = Column(Text, nullable=False)                    # 文本内容
+    media_type = Column(String(20), default="text")           # text/image/link
+    media_url = Column(Text, default="")                      # 素材URL
+
+    # 目标筛选
+    target_tags = Column(Text, default="[]")                  # 按标签筛选
+    target_source = Column(String(30), default="")            # 按来源筛选
+    target_count = Column(Integer, default=0)                 # 目标客户数
+
+    # 发送状态
+    status = Column(String(20), default="draft")              # draft/scheduled/sending/sent/failed
+    scheduled_at = Column(DateTime, nullable=True)            # 定时发送
+    sent_count = Column(Integer, default=0)                   # 已发送数
+    fail_count = Column(Integer, default=0)                   # 失败数
+    sent_at = Column(DateTime, nullable=True)                 # 实际发送时间
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 def init_db():
     """初始化数据库表并创建默认管理员"""
     Base.metadata.create_all(bind=engine)
@@ -838,6 +1289,15 @@ def init_db():
             ("leads", "loss_reason", "VARCHAR(200) DEFAULT ''"),
             ("leads", "attribution_task_id", "INTEGER"),
             ("leads", "attribution_content_id", "INTEGER"),
+            # P1-5: 全链路归因扩展 — 热点/评论/账号/加好友
+            ("leads", "attribution_topic_id", "INTEGER"),
+            ("leads", "attribution_comment_id", "INTEGER"),
+            ("leads", "attribution_account_id", "INTEGER"),
+            ("leads", "attribution_channel", "VARCHAR(50) DEFAULT ''"),
+            ("leads", "friend_added", "BOOLEAN DEFAULT 0"),
+            ("leads", "friend_added_at", "DATETIME"),
+            ("leads", "friend_added_via", "VARCHAR(50) DEFAULT ''"),
+            ("leads", "journey_events", "TEXT DEFAULT '[]'"),
             # TopicLibrary 扩展
             ("topic_library", "source", "VARCHAR(50) DEFAULT 'manual'"),
             ("topic_library", "source_platform", "VARCHAR(30) DEFAULT ''"),
@@ -855,6 +1315,32 @@ def init_db():
             ("content_performance", "variant_id", "INTEGER"),
             ("content_performance", "is_winner", "BOOLEAN DEFAULT 0"),
             ("content_performance", "tags", "TEXT DEFAULT ''"),
+        ]:
+            try:
+                _ensure_column(db, table, col, dtype)
+            except Exception:
+                db.rollback()
+
+        # ── P1-7: 素材资产库升级 — 版本管理 + A/B 测试 + 模板市场 ──
+        for table, col, dtype in [
+            # PlatformTask: A/B 追踪 — 记录使用的素材模板/变体
+            ("platform_tasks", "source_template_id", "INTEGER"),
+            # ContentLibrary: 版本管理
+            ("content_library", "version", "INTEGER DEFAULT 1"),
+            ("content_library", "changed_by", "INTEGER"),
+            ("content_library", "updated_at", "DATETIME"),
+            # ContentLibrary: A/B 变体统计
+            ("content_library", "base_template_id", "INTEGER"),
+            ("content_library", "variant_label", "VARCHAR(20) DEFAULT ''"),
+            ("content_library", "ab_test_count", "INTEGER DEFAULT 0"),
+            ("content_library", "reply_count", "INTEGER DEFAULT 0"),
+            ("content_library", "lead_count", "INTEGER DEFAULT 0"),
+            ("content_library", "converted_count", "INTEGER DEFAULT 0"),
+            # ContentLibrary: 模板市场
+            ("content_library", "is_market_template", "BOOLEAN DEFAULT 0"),
+            ("content_library", "industry", "VARCHAR(50) DEFAULT '通用'"),
+            ("content_library", "market_category", "VARCHAR(50) DEFAULT ''"),
+            ("content_library", "fork_count", "INTEGER DEFAULT 0"),
         ]:
             try:
                 _ensure_column(db, table, col, dtype)

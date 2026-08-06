@@ -4,9 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
-from database import get_db, User
+from database import get_db, User, HotTopic
 from services.hot_topic_service import hot_topic_service, HOT_SEARCH_URLS
-from services.auth_service import get_current_user, require_permission
+from services.auth_service import (
+    get_current_user, require_role, own_or_admin,
+)
 from config import settings
 
 router = APIRouter(prefix="/api/hot-topics", tags=["热点选题引擎"])
@@ -43,7 +45,7 @@ async def list_supported_platforms(
 @router.post("/fetch")
 async def fetch_hot_list(
     req: FetchHotListRequest,
-    user: User = Depends(require_permission("editor")),
+    user: User = Depends(require_role("editor")),
     db: Session = Depends(get_db),
 ):
     """抓取指定平台热榜"""
@@ -71,7 +73,7 @@ async def fetch_hot_list(
 @router.post("/auto-generate")
 async def auto_generate_topics(
     req: AutoGenerateRequest,
-    user: User = Depends(require_permission("editor")),
+    user: User = Depends(require_role("editor")),
 ):
     """将高分热点自动生成选题"""
     topics = hot_topic_service.auto_generate_topics(
@@ -105,18 +107,26 @@ async def list_hot_topics(
     return {"topics": topics, "total": len(topics)}
 
 
+# ── 辅助：归属校验 ──
+
+def _get_hot_topic_or_403(topic_id: int, user: User, db: Session) -> HotTopic:
+    ht = db.query(HotTopic).filter(HotTopic.id == topic_id).first()
+    if not ht:
+        raise HTTPException(status_code=404, detail="热点不存在")
+    if not own_or_admin(user, ht.user_id):
+        raise HTTPException(status_code=403, detail="无权访问此热点")
+    return ht
+
+
 @router.post("/score/{topic_id}")
 async def rescore_topic(
     topic_id: int,
     user_keywords: List[str] = Query(default=None),
-    user: User = Depends(require_permission("editor")),
+    user: User = Depends(require_role("editor")),
     db: Session = Depends(get_db),
 ):
     """重新评分单个热点"""
-    from database import HotTopic
-    ht = db.query(HotTopic).filter(HotTopic.id == topic_id).first()
-    if not ht:
-        raise HTTPException(status_code=404, detail="热点不存在")
+    ht = _get_hot_topic_or_403(topic_id, user, db)
 
     topic_data = {
         "title": ht.title,
@@ -130,7 +140,6 @@ async def rescore_topic(
     ht.relevance_score = scores["relevance_score"]
     ht.potential_score = scores["potential_score"]
     ht.final_score = scores["final_score"]
-    ht.last_updated_at = ht.last_updated_at  # no change
 
     db.commit()
     return {"scores": scores}
@@ -139,17 +148,11 @@ async def rescore_topic(
 @router.delete("/{topic_id}")
 async def delete_hot_topic(
     topic_id: int,
-    user: User = Depends(require_permission("editor")),
+    user: User = Depends(require_role("editor")),
     db: Session = Depends(get_db),
 ):
     """删除热点记录"""
-    from database import HotTopic
-    ht = db.query(HotTopic).filter(HotTopic.id == topic_id).first()
-    if not ht:
-        raise HTTPException(status_code=404, detail="热点不存在")
-    if user.role != "admin" and ht.user_id != user.id:
-        raise HTTPException(status_code=403, detail="无权删除")
-
+    ht = _get_hot_topic_or_403(topic_id, user, db)
     db.delete(ht)
     db.commit()
     return {"success": True}

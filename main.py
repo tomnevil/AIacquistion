@@ -32,6 +32,15 @@ from hot_topic_api import router as hot_topic_router
 from follow_up_api import router as follow_up_router
 from optimization_api import router as optimization_router
 from competitor_api import router as competitor_router
+from dashboard_api import router as dashboard_router
+from account_health_api import router as account_health_router
+from inbox_api import router as inbox_router
+from workflow_api import router as workflow_router
+from attribution_api import router as attribution_router
+from wecom_api import router as wecom_router
+from content_asset_api import router as content_asset_router
+from agent_api import router as agent_router
+from export_api import router as export_router
 from config import settings
 
 
@@ -58,6 +67,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         app_logger.warning(f"定时调度器启动失败: {e}")
 
+    # 启动自动备份服务
+    try:
+        from services.backup_service import get_backup_service
+        backup_service = get_backup_service()
+        backup_service.start_backup_service()
+        app_logger.info("自动备份服务已启动")
+    except Exception as e:
+        app_logger.warning(f"自动备份服务启动失败: {e}")
+
     yield
 
     # 停止定时发布调度器
@@ -70,6 +88,15 @@ async def lifespan(app: FastAPI):
     try:
         from services.notification_service import notification_service
         await notification_service.stop()
+    except Exception:
+        pass
+
+    # 停止自动备份服务
+    try:
+        from services.backup_service import get_backup_service
+        backup_service = get_backup_service()
+        backup_service.stop_backup_service()
+        app_logger.info("自动备份服务已停止")
     except Exception:
         pass
     app_logger.info("AI 获客系统已关闭")
@@ -90,6 +117,15 @@ app.include_router(hot_topic_router)
 app.include_router(follow_up_router)
 app.include_router(optimization_router)
 app.include_router(competitor_router)
+app.include_router(dashboard_router)
+app.include_router(account_health_router)
+app.include_router(inbox_router)
+app.include_router(workflow_router)
+app.include_router(attribution_router)
+app.include_router(wecom_router)
+app.include_router(content_asset_router)
+app.include_router(agent_router)
+app.include_router(export_router)
 
 
 @app.exception_handler(Exception)

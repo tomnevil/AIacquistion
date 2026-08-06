@@ -15,6 +15,9 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 
 from database import SessionLocal, RiskBlacklist, RiskContentHash
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class PlatformRisk:
@@ -291,7 +294,7 @@ class RiskControl:
         # 连续失败检测
         recent_failures = [r for r in recent_results[-5:] if not r.get("success", True)]
         if len(recent_failures) >= 5:
-            print(f"[RiskControl] [!] 账号 {account['account_name']} 连续5次操作失败，暂停使用")
+            logger.warning(f"[RiskControl] [!] 账号 {account['account_name']} 连续5次操作失败，暂停使用")
             return True
 
         return False
@@ -325,7 +328,7 @@ class RiskControl:
     def blacklist_account(self, account_id: int, reason: str = ""):
         """拉黑账号"""
         self._blacklist.add(account_id)
-        print(f"[RiskControl] 🚫 账号 {account_id} 已被加入黑名单")
+        logger.warning(f"[RiskControl] 🚫 账号 {account_id} 已被加入黑名单")
         
         db = SessionLocal()
         try:

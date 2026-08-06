@@ -9,6 +9,9 @@ from database import (
 )
 from config import settings
 from services.ai_service import AIService
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class CompetitorService:
@@ -130,7 +133,7 @@ class CompetitorService:
                 comp.last_monitored_at = datetime.utcnow()
                 db.commit()
             except Exception as e:
-                print(f"[Competitor] 抓取竞品内容失败: {e}")
+                logger.error(f"[Competitor] 抓取竞品内容失败: {e}")
 
             return contents
         except Exception as e:
@@ -355,7 +358,7 @@ class CompetitorService:
             db.refresh(report)
             return report
         except Exception as e:
-            print(f"[Competitor] 周报生成失败: {e}")
+            logger.error(f"[Competitor] 周报生成失败: {e}")
             db.rollback()
             raise e
         finally:

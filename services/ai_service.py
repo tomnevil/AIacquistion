@@ -3,6 +3,9 @@ import asyncio
 import json
 import httpx
 from config import settings
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class AIService:
@@ -12,28 +15,35 @@ class AIService:
     async def _call_ai(system_prompt: str, user_prompt: str) -> str:
         """通用 AI 调用"""
         if not settings.AI_API_KEY or settings.AI_API_KEY.startswith("your-"):
-            # 没有配置 API Key 时返回模拟数据
             return "[MOCK] AI服务未配置，请设置 .env 中的 AI_API_KEY"
 
-        async with httpx.AsyncClient(timeout=settings.AI_TIMEOUT) as client:
-            resp = await client.post(
-                f"{settings.AI_API_BASE}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {settings.AI_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": settings.AI_MODEL,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                    "temperature": settings.AI_TEMPERATURE,
-                    "max_tokens": settings.AI_MAX_TOKENS,
-                },
-            )
-            data = resp.json()
-            return data["choices"][0]["message"]["content"]
+        try:
+            async with httpx.AsyncClient(timeout=settings.AI_TIMEOUT) as client:
+                resp = await client.post(
+                    f"{settings.AI_API_BASE}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {settings.AI_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": settings.AI_MODEL,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        "temperature": settings.AI_TEMPERATURE,
+                        "max_tokens": settings.AI_MAX_TOKENS,
+                    },
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                return data["choices"][0]["message"]["content"]
+        except httpx.HTTPStatusError as e:
+            logger.error(f"AI API HTTP {e.response.status_code}: {e.response.text[:200]}")
+            return f"[ERROR] AI API 返回 HTTP {e.response.status_code}"
+        except httpx.RequestError as e:
+            logger.error(f"AI API 请求失败: {e}")
+            return f"[ERROR] AI API 请求超时或网络错误"
 
     @staticmethod
     async def score_lead(lead: dict) -> dict:
@@ -110,7 +120,7 @@ AI评分: {lead.get('ai_score', '未评分')}分"""
         valid = [r for r in results if not isinstance(r, Exception)]
         errors = [str(r) for r in results if isinstance(r, Exception)]
         if errors:
-            print(f"[AI] batch_analyze errors: {errors}")
+            logger.warning(f"batch_analyze errors: {errors}")
 
         valid.sort(key=lambda x: x.get("score", 0), reverse=True)
         return valid

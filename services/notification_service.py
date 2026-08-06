@@ -16,6 +16,9 @@ from database import (
 from platforms.models import PlatformTask, PlatformTaskStatus, TaskType
 from services.risk_control import risk_control
 from config import settings
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 # 高购买意图关键词 — 命中则标记为潜在客户并提高优先级
 LEAD_KEYWORDS = [
@@ -89,7 +92,7 @@ class NotificationService:
         await browser_engine.start()
         self._running = True
         self._task = asyncio.create_task(self._poll_loop())
-        print(f"[Notification] 监控服务已启动 (间隔 {self._interval}s)")
+        logger.info(f"[Notification] 监控服务已启动 (间隔 {self._interval}s)")
 
     async def stop(self):
         """停止后台轮询"""
@@ -106,7 +109,7 @@ class NotificationService:
             await browser_engine.stop()
         except Exception:
             pass
-        print("[Notification] 监控服务已停止")
+        logger.info("[Notification] 监控服务已停止")
 
     async def _poll_loop(self):
         """后台轮询循环"""
@@ -114,7 +117,7 @@ class NotificationService:
             try:
                 await self._check_all_accounts()
             except Exception as e:
-                print(f"[Notification] 轮询出错: {e}")
+                logger.error(f"[Notification] 轮询出错: {e}")
             await asyncio.sleep(self._interval)
 
     async def check_account_now(self, account_id: int) -> dict:
@@ -140,7 +143,7 @@ class NotificationService:
                 try:
                     await self._check_single_account(acc.id, db)
                 except Exception as e:
-                    print(f"[Notification] 账号 {acc.id} ({acc.platform}) 检查失败: {e}")
+                    logger.error(f"[Notification] 账号 {acc.id} ({acc.platform}) 检查失败: {e}")
         finally:
             db.close()
 
@@ -320,7 +323,7 @@ class NotificationService:
 
             if new_count > 0:
                 db.commit()
-                print(f"[Notification] 账号 {account.account_name} ({platform_name}) "
+                logger.error(f"[Notification] 账号 {account.account_name} ({platform_name}) "
                       f"发现 {new_count} 条新通知")
             else:
                 db.rollback()
@@ -329,7 +332,7 @@ class NotificationService:
             result["error"] = str(e)
             if close_db:
                 db.rollback()
-            print(f"[Notification] 检查账号 {account_id} 异常: {e}")
+            logger.error(f"[Notification] 检查账号 {account_id} 异常: {e}")
         finally:
             if close_db:
                 db.close()

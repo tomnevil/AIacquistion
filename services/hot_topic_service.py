@@ -7,6 +7,9 @@ from typing import Optional
 
 from database import SessionLocal, HotTopic, TopicLibrary, Lead
 from config import settings
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 # ── 购买意图关键词库（复用 notification_service 的意图检测） ──
 PURCHASE_INTENT_KEYWORDS = [
@@ -201,13 +204,13 @@ class HotTopicService:
             
             await engine.teardown()
         except Exception as e:
-            print(f"[HotTopic] Playwright 抓取 {platform} 失败，降级使用演示数据: {e}")
+            logger.warning(f"[HotTopic] Playwright 抓取 {platform} 失败，降级使用演示数据: {e}")
 
         # 降级：使用演示数据
         if not topics:
             topics = DEMO_HOT_DATA.get(platform, [])
             if topics:
-                print(f"[HotTopic] 使用演示数据: {platform} ({len(topics)} 条)")
+                logger.info(f"[HotTopic] 使用演示数据: {platform} ({len(topics)} 条)")
 
         return topics
 
@@ -366,11 +369,22 @@ class HotTopicService:
                 ).first()
 
                 if existing:
-                    # 更新已有记录
+                    score_result = HotTopicService.score_topic(topic_data, user_keywords)
                     existing.heat_value = topic_data.get("heat_value", existing.heat_value)
                     existing.rank_position = topic_data.get("rank_position", existing.rank_position)
+                    existing.trend = topic_data.get("trend", existing.trend or "flat")
+                    existing.trend_speed = topic_data.get("trend_speed", existing.trend_speed or 0)
+                    existing.hot_score = score_result["hot_score"]
+                    existing.relevance_score = score_result["relevance_score"]
+                    existing.potential_score = score_result["potential_score"]
+                    existing.final_score = score_result["final_score"]
                     existing.last_updated_at = datetime.utcnow()
                     existing.status = "scored"
+                    if topic_data.get("url"):
+                        existing.url = topic_data["url"]
+                    if topic_data.get("category"):
+                        existing.category = topic_data["category"]
+                    existing.raw_data = json.dumps(topic_data, ensure_ascii=False)
                 else:
                     # 创建新记录
                     score_result = HotTopicService.score_topic(topic_data, user_keywords)
@@ -382,7 +396,7 @@ class HotTopicService:
                         category=topic_data.get("category", ""),
                         rank_position=topic_data.get("rank_position", 0),
                         heat_value=topic_data.get("heat_value", 0),
-                        trend="rising" if topic_data.get("rank_position", 50) < 20 else "flat",
+                        trend=topic_data.get("trend", "flat"),
                         trend_speed=topic_data.get("trend_speed", 0),
                         hot_score=score_result["hot_score"],
                         relevance_score=score_result["relevance_score"],
@@ -398,7 +412,7 @@ class HotTopicService:
             db.commit()
             return new_count
         except Exception as e:
-            print(f"[HotTopic] 保存热点失败: {e}")
+            logger.error(f"[HotTopic] 保存热点失败: {e}")
             db.rollback()
             return 0
         finally:
@@ -465,7 +479,7 @@ class HotTopicService:
             db.commit()
             return generated
         except Exception as e:
-            print(f"[HotTopic] 自动生成选题失败: {e}")
+            logger.error(f"[HotTopic] 自动生成选题失败: {e}")
             db.rollback()
             return []
         finally:

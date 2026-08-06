@@ -1,7 +1,7 @@
 """流量与内容优化引擎 — 爆款拆解、A/B 测试、多平台再创作、搜索流量布局"""
 import json
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from database import (
@@ -11,6 +11,9 @@ from database import (
 from config import settings
 from services.ai_service import AIService
 from services.content_strategy import ContentStrategy
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 # ── 爆款特征模板（用于拆解分析） ──
@@ -191,7 +194,7 @@ class ContentOptimization:
         except Exception as e:
             if own_db:
                 db.rollback()
-            print(f"[ContentOpt] A/B 变体生成失败: {e}")
+            logger.error(f"[ContentOpt] A/B 变体生成失败: {e}")
             return []
         finally:
             if own_db:
@@ -280,7 +283,7 @@ class ContentOptimization:
                     db.add(variant)
                     created.append(variant)
                 except Exception as e:
-                    print(f"[ContentOpt] 再创作 {target} 失败: {e}")
+                    logger.error(f"[ContentOpt] 再创作 {target} 失败: {e}")
                     continue
 
             db.commit()
@@ -288,7 +291,7 @@ class ContentOptimization:
         except Exception as e:
             if own_db:
                 db.rollback()
-            print(f"[ContentOpt] 跨平台再创作失败: {e}")
+            logger.error(f"[ContentOpt] 跨平台再创作失败: {e}")
             return []
         finally:
             if own_db:
@@ -326,7 +329,7 @@ class ContentOptimization:
             db = SessionLocal()
         try:
             # 获取最近 30 天的内容表现
-            since = datetime.utcnow()
+            since = datetime.utcnow() - timedelta(days=30)
             perfs = db.query(ContentPerformance).filter(
                 ContentPerformance.user_id == user_id,
                 ContentPerformance.published_at >= since,

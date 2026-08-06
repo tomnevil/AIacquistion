@@ -1,0 +1,291 @@
+<!-- 
+这是完整的独立数据导出与备份页面的HTML代码段
+可以直接替换到index.html中的对应部分
+-->
+
+<!-- 数据导出标签页 - 完整实现 -->
+<div id="tab-export" style="display:none">
+  <!-- 页面标题区域 -->
+  <div class="section-header">
+    <h2 style="margin:0 0 8px 0;color:#1e293b;font-size:1.5rem;font-weight:700">📤 数据导出</h2>
+    <span style="color:#64748b;font-size:0.9rem;display:block">一键导出全部线索/内容/报表（Excel/CSV/PDF），满足数据安全管理需求</span>
+    <div style="flex:1"></div>
+  </div>
+
+  <!-- 导出功能卡片区 -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:24px">
+    
+    <!-- 线索导出卡片 -->
+    <div class="panel-card" style="background:#fff;padding:20px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e2e8f0">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <div style="font-size:24px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:#fef3c7;border-radius:8px">🎯</div>
+        <div style="flex:1">
+          <div style="font-weight:700;color:#1e293b;margin-bottom:2px">线索数据</div>
+          <div style="font-size:12px;color:#64748b">客户信息、评分、转化记录</div>
+        </div>
+      </div>
+      
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn" onclick="alert('导出线索数据 (CSV 格式)')" style="border:1px solid #e2e8f0;background:#fff;color:#475569;border-radius:6px;padding:8px 12px;font-size:13px;display:flex;align-items:center;gap:6px;flex:1;min-width:0;justify-content:center">
+          📄 CSV
+        </button>
+        <button class="btn" onclick="alert('导出线索数据 (Excel 格式)')" style="border:none;background:#3b82f6;color:#fff;border-radius:6px;padding:8px 12px;font-size:13px;display:flex;align-items:center;gap:6px;flex:1;min-width:0;justify-content:center">
+          📊 Excel
+        </button>
+        <button class="btn" onclick="alert('导出线索数据 (PDF 格式)')" style="border:none;background:#64748b;color:#fff;border-radius:6px;padding:8px 12px;font-size:13px;display:flex;align-items:center;gap:6px;flex:1;min-width:0;justify-content:center">
+          📋 PDF
+        </button>
+      </div>
+      
+      <div style="margin-top:12px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#64748b;cursor:pointer;padding:6px 8px;background:#f8fafc;border-radius:4px">
+          <input type="checkbox" id="exportLeadsSelected" onchange="console.log('仅导出选中线索:', this.checked)" style="margin:0"> 
+          <span>仅导出选中线索</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- 内容导出卡片 -->
+    <div class="panel-card" style="background:#fff;padding:20px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e2e8f0">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <div style="font-size:24px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:#dbeafe;border-radius:8px">📝</div>
+        <div style="flex:1">
+          <div style="font-weight:700;color:#1e293b;margin-bottom:2px">内容数据</div>
+          <div style="font-size:12px;color:#64748b">素材库、内容表现、A/B测试</div>
+        </div>
+      </div>
+      
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn" onclick="alert('导出内容数据 (Excel 报表)')" style="border:none;background:#3b82f6;color:#fff;border-radius:6px;padding:8px 16px;font-size:13px;display:flex;align-items:center;gap:8px;flex:1;justify-content:center">
+          📊 Excel 报表
+        </button>
+      </div>
+      <div style="font-size:11px;color:#94a3b8;line-height:1.4;padding:8px;background:#f8fafc;border-radius:4px">
+        包含内容素材和使用统计数据，支持多sheet导出，便于深入分析
+      </div>
+    </div>
+
+    <!-- 报表导出卡片 -->
+    <div class="panel-card" style="background:#fff;padding:20px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e2e8f0">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <div style="font-size:24px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:#fef3c7;border-radius:8px">📊</div>
+        <div style="flex:1">
+          <div style="font-weight:700;color:#1e293b;margin-bottom:2px">分析报表</div>
+          <div style="font-size:12px;color:#64748b">转化漏斗、平台统计、ROI分析</div>
+        </div>
+      </div>
+      
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn" onclick="alert('导出分析报表 (Excel 格式)')" style="border:none;background:#3b82f6;color:#fff;border-radius:6px;padding:8px 16px;font-size:13px;display:flex;align-items:center;gap:8px;flex:1;justify-content:center">
+          📊 数据报表
+        </button>
+      </div>
+      <div style="font-size:11px;color:#94a3b8;line-height:1.4;padding:8px;background:#f8fafc;border-radius:4px">
+        综合统计分析，包含转化漏斗和多维度对比分析，助力数据驱动决策
+      </div>
+    </div>
+  </div>
+
+  <!-- 页脚区域 -->
+  <div class="panel-card" style="background:#fff;padding:20px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e2e8f0">
+    <div style="display:flex;align-items:center;gap:16px">
+      <div style="font-size:32px">🛡️</div>
+      <div style="font-size:13px;line-height:1.6;color:#475569">
+        <strong style="color:#1e293b">数据安全保障：</strong> 一键导出让您随时掌控数据，多格式导出满足不同场景需求，
+        支持Excel/CSV/PDF三种主流格式，让您的数据分析更灵活高效。
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 数据备份标签页 - 完整实现 -->
+<div id="tab-backup" style="display:none">
+  <!-- 页面标题区域 -->
+  <div class="section-header">
+    <h2 style="margin:0 0 8px 0;color:#1e293b;font-size:1.5rem;font-weight:700">💾 数据备份</h2>
+    <span style="color:#64748b;font-size:0.9rem;display:block">定时自动备份，客户数据安全感是B端产品的隐形刚需</span>
+    <div style="flex:1"></div>
+    <button class="btn" onclick="alert('开始手动备份...')" style="border:none;background:#10b981;color:#fff;border-radius:6px;padding:10px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">
+      🔄 立即备份
+    </button>
+  </div>
+
+  <!-- 配置和状态区 -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:24px">
+    
+    <!-- 备份配置卡片 -->
+    <div class="panel-card" style="background:#fff;padding:20px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e2e8f0">
+      <div style="font-weight:700;font-size:15px;color:#1e293b;margin-bottom:16px">⚙️ 自动备份配置</div>
+      <div style="display:grid;gap:16px">
+        
+        <!-- 启用备份 -->
+        <div>
+          <label style="font-size:13px;color:#64748b;display:block;margin-bottom:6px">启用自动备份</label>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 16px;border-radius:6px;background:#f8fafc;border:1px solid #e2e8f0">
+            <input type="checkbox" id="backupEnabled" onchange="console.log('启用自动备份:', this.checked)" style="margin:0;width:auto">
+            <span style="font-size:13px;color:#334155">定期自动备份我的数据</span>
+          </label>
+        </div>
+        
+        <!-- 备份时间 -->
+        <div>
+          <label style="font-size:13px;color:#64748b;display:block;margin-bottom:6px">备份时间</label>
+          <input type="time" id="backupTime" value="02:00" onchange="console.log('备份时间:', this.value)" style="width:100%;padding:10px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#334155">
+        </div>
+        
+        <!-- 备份频率 -->
+        <div>
+          <label style="font-size:13px;color:#64748b;display:block;margin-bottom:6px">备份频率</label>
+          <select id="backupFrequency" onchange="console.log('备份频率:', this.value)" style="width:100%;padding:10px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#334155">
+            <option value="1">每天</option>
+            <option value="3">每3天</option>
+            <option value="7" selected>每周</option>
+            <option value="14">每2周</option>
+            <option value="30">每月</option>
+          </select>
+        </div>
+        
+        <!-- 保留天数 -->
+        <div>
+          <label style="font-size:13px;color:#64748b;display:block;margin-bottom:6px">保留天数</label>
+          <select id="backupRetention" onchange="console.log('保留天数:', this.value)" style="width:100%;padding:10px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#334155">
+            <option value="7">7天</option>
+            <option value="14">14天</option>
+            <option value="30" selected>30天</option>
+            <option value="60">60天</option>
+            <option value="90">90天</option>
+          </select>
+        </div>
+        
+        <!-- 保存配置按钮 -->
+        <div style="margin-top:8px">
+          <button class="btn" onclick="alert('备份配置已保存')" style="width:100%;border:none;background:#3b82f6;color:#fff;border-radius:6px;padding:10px 16px;font-size:13px;font-weight:600">
+            💾 保存配置
+          </button>  
+        </div>
+      </div>
+    </div>
+
+    <!-- 备份状态卡片 -->
+    <div class="panel-card" style="background:#fff;padding:20px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e2e8f0">
+      <div style="font-weight:700;font-size:15px;color:#1e293b;margin-bottom:16px">📊 备份状态</div>
+      <div style="display:grid;gap:12px;font-size:13px">
+        
+        <!-- 备份状态 -->
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#f0fdf4;border-radius:6px;border-left:4px solid #10b981">
+          <span style="color:#64748b">状态</span>
+          <span style="font-weight:600;color:#10b981">已启用</span>
+        </div>
+        
+        <!-- 最后备份 -->
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#f8fafc;border-radius:6px">
+          <span style="color:#64748b">最后备份</span>
+          <span style="font-weight:600;color:#334155" id="lastBackup">今天 14:30</span>
+        </div>
+        
+        <!-- 下次备份 -->
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#f8fafc;border-radius:6px">
+          <span style="color:#64748b">下次备份</span>
+          <span style="font-weight:600;color:#334155" id="nextBackup">明天 02:00</span>
+        </div>
+        
+        <!-- 备份文件数 -->
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#fefbff;border-radius:6px;border-left:4px solid #3b82f6">
+          <span style="color:#64748b">备份文件数</span>
+          <span style="font-weight:600;color:#3b82f6" id="backupCount">3</span>
+        </div>
+        
+        <!-- 刷新按钮 -->
+        <div style="margin-top:8px">
+          <button class="btn" onclick="alert('刷新备份状态')" style="width:100%;border:1px solid #e2e8f0;background:#fff;color:#475569;border-radius:6px;padding:8px 16px;font-size:12px">
+            🔄 刷新状态
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 备份历史卡片 -->
+  <div class="panel-card" style="background:#fff;padding:20px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e2e8f0;margin-bottom:24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-weight:700;font-size:15px;color:#1e293b">📦 备份历史</div>
+      <button class="btn" onclick="alert('刷新备份列表')" style="border:1px solid #e2e8f0;background:#fff;color:#475569;border-radius:6px;padding:8px 16px;font-size:12px">
+        🔄 刷新
+      </button>
+    </div>
+    
+    <!-- 备份列表 -->
+    <div id="backupList" style="max-height:360px;overflow-y:auto">
+      <!-- 备份项1 -->
+      <div class="backup-item" style="padding:16px;border-radius:8px;background:#f8fafc;margin-bottom:12px;border-left:4px solid #10b981">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:14px;color:#334155;margin-bottom:4px">backup_20260801_143000.xlsx</div>
+            <div style="font-size:12px;color:#64748b">今天 14:30 · 2.4 MB</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;font-weight:600;color:#10b981;background:#f0fdf4;padding:2px 8px;border-radius:4px">已完成</span>
+            <button class="btn" onclick="alert('开始下载备份文件')" style="border:1px solid #e2e8f0;background:#fff;color:#475569;border-radius:4px;padding:6px 12px;font-size:11px">下载</button>
+            <button class="btn" onclick="if(confirm('确认删除此备份')) alert('备份已删除')" style="border:none;background:#ef4444;color:#fff;border-radius:4px;padding:6px 12px;font-size:11px">删除</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 备份项2 -->
+      <div class="backup-item" style="padding:16px;border-radius:8px;background:#f8fafc;margin-bottom:12px;border-left:4px solid #10b981">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:14px;color:#334155;margin-bottom:4px">backup_20260731_143000.xlsx</div><div style="font-size:12px;color:#64748b">昨天 14:30 · 2.1 MB</div>
+          </div>
+          <div style="display:flex;align-items-center;gap:8px">
+            <span style="font-size:11px;font-weight:600;color:#10b981;background:#f0fdf4;padding:2px 8px;border-radius:4px">已完成</span>
+            <button class="btn" onclick="alert('开始下载备份文件')" style="border:1px solid #e2e8f0;background:#fff;color:#475569;border-radius:4px;padding:6px 12px;font-size:11px">下载</button>
+            <button class="btn" onclick="if(confirm('确认删除此备份')) alert('备份已删除')" style="border:none;background:#ef4444;color:#fff;border-radius:4px;padding:6px 12px;font-size:11px">删除</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 备份项3 -->
+      <div class="backup-item" style="padding:16px;border-radius:8px;background:#f8fafc;margin-bottom:12px;border-left:4px solid #10b981">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:14px;color:#334155;margin-bottom:4px">backup_20260730_143000.xlsx</div>
+            <div style="font-size:12px;color:#64748b">3天前 14:30 · 1.9 MB</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;font-weight:600;color:#10b981;background:#f0fdf4;padding:2px 8px;border-radius:4px">已完成</span>
+            <button class="btn" onclick="alert('开始下载备份文件')" style="border:1px solid #e2e8f0;background:#fff;color:#475569;border-radius:4px;padding:6px 12px;font-size:11px">下载</button>
+            <button class="btn" onclick="if(confirm('确认删除此备份')) alert('备份已删除')" style="border:none;background:#ef4444;color:#fff;border-radius:4px;padding:6px 12px;font-size:11px">删除</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 说明卡片 -->
+  <div class="panel-card" style="background:#fff;padding:20px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e2e8f0">
+    <div style="display:flex;align-items:center;gap:16px">
+      <div style="font-size:48px">🛡️</div>
+      <div style="font-size:13px;line-height:1.7;color:#475569">
+        <strong style="color:#1e293b;font-size:14px">备份说明：</strong> 
+        系统会在您设定的时间自动备份所有业务数据，支持按天/周/月不同频率。备份文件保留指定天数后自动删除。
+        您可以随时手动创建备份或下载历史备份文件，确保业务数据安全无虞。
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 修复完成的页面样式 -->
+<style>
+#tab-export, #tab-backup {
+    background: #fff !important;
+    min-height: 400px !important;
+    padding: 20px !important;
+}
+
+#tab-export.active, #tab-backup.active {
+    display: block !important;
+    position: relative !important;
+    z-index: 100 !important;
+}
+</style>

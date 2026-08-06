@@ -99,6 +99,42 @@ class BrowserEngine:
                     pass
             self._playwright = None
 
+    # ── 简易抓取封装（供 hot_topic_service / competitor_service 使用） ──
+
+    async def launch(self):
+        """启动浏览器，创建一个无账号的简单页面用于抓取"""
+        await self.start()
+        if self._playwright is None:
+            raise RuntimeError("Playwright 未初始化")
+        account = {"id": "_scrape_", "proxy": None, "user_agent": None}
+        self._scrape_page = await self.new_page(account)
+
+    async def goto(self, url: str):
+        """导航到指定 URL"""
+        if not hasattr(self, '_scrape_page'):
+            raise RuntimeError("请先调用 launch()")
+        await self._scrape_page.goto(url, wait_until="domcontentloaded", timeout=30000)
+
+    async def wait(self, seconds: float = 2.0):
+        """等待指定秒数"""
+        await asyncio.sleep(seconds)
+
+    async def evaluate(self, js: str):
+        """在页面中执行 JS 并返回结果"""
+        if not hasattr(self, '_scrape_page'):
+            raise RuntimeError("请先调用 launch()")
+        return await self._scrape_page.evaluate(js)
+
+    async def teardown(self):
+        """关闭抓取页面，释放浏览器"""
+        if hasattr(self, '_scrape_page'):
+            try:
+                await self._scrape_page.close()
+            except:
+                pass
+            del self._scrape_page
+        await self.stop()
+
     async def get_context(self, account: dict) -> BrowserContext:
         """
         获取或创建指定账号的浏览器上下文

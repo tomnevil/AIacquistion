@@ -4,9 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
-from database import get_db, User
+from database import get_db, User, ContentLibrary, PlatformTask, ContentVariant
 from services.content_optimization import content_optimization
-from services.auth_service import get_current_user, require_permission
+from services.auth_service import (
+    get_current_user, require_role, own_or_admin,
+)
 
 router = APIRouter(prefix="/api/optimization", tags=["内容优化引擎"])
 
@@ -33,14 +35,35 @@ class SelectWinnerRequest(BaseModel):
     variant_ids: List[int] = Field(..., min_length=2, description="变体 ID 列表")
 
 
+# ── 辅助：归属校验 ──
+
+def _check_content_ownership(content_id: int, user: User, db: Session):
+    content = db.query(ContentLibrary).filter(ContentLibrary.id == content_id).first()
+    if not content:
+        raise HTTPException(status_code=404, detail="内容不存在")
+    if not own_or_admin(user, content.user_id):
+        raise HTTPException(status_code=403, detail="无权访问此内容")
+    return content
+
+def _check_task_ownership(task_id: int, user: User, db: Session):
+    task = db.query(PlatformTask).filter(PlatformTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if not own_or_admin(user, task.user_id):
+        raise HTTPException(status_code=403, detail="无权访问此任务")
+    return task
+
+
 # ── API 端点 ──
 
 @router.post("/analyze/{content_id}")
 async def analyze_viral_content(
     content_id: int,
-    user: User = Depends(require_permission("editor")),
+    user: User = Depends(require_role("editor")),
+    db: Session = Depends(get_db),
 ):
     """爆款内容拆解分析"""
+    _check_content_ownership(content_id, user, db)
     result = await content_optimization.analyze_viral_content(content_id)
     if not result:
         raise HTTPException(status_code=404, detail="分析失败")
@@ -50,10 +73,11 @@ async def analyze_viral_content(
 @router.post("/ab-test/generate")
 async def create_ab_test_variants(
     req: ABTestRequest,
-    user: User = Depends(require_permission("editor")),
+    user: User = Depends(require_role("editor")),
     db: Session = Depends(get_db),
 ):
     """为 A/B 测试生成多个内容变体"""
+    _check_task_ownership(req.task_id, user, db)
     variants = await content_optimization.create_ab_test_variants(
         task_id=req.task_id,
         platform=req.platform,
@@ -70,10 +94,15 @@ async def create_ab_test_variants(
 @router.post("/ab-test/select-winner")
 async def select_ab_test_winner(
     req: SelectWinnerRequest,
-    user: User = Depends(require_permission("editor")),
+    user: User = Depends(require_role("editor")),
     db: Session = Depends(get_db),
 ):
     """从 A/B 测试中选出胜出变体"""
+    # 校验所有变体归属
+    for vid in req.variant_ids:
+        v = db.query(ContentVariant).filter(ContentVariant.id == vid).first()
+        if v and not own_or_admin(user, v.user_id):
+            raise HTTPException(status_code=403, detail="无权操作此变体")
     winner = content_optimization.select_winner(req.variant_ids, db)
     if not winner:
         raise HTTPException(status_code=404, detail="未找到变体")
@@ -83,10 +112,11 @@ async def select_ab_test_winner(
 @router.post("/repurpose")
 async def cross_platform_repurpose(
     req: RepurposeRequest,
-    user: User = Depends(require_permission("editor")),
+    user: User = Depends(require_role("editor")),
     db: Session = Depends(get_db),
 ):
     """跨平台内容再创作"""
+    _check_content_ownership(req.source_content_id, user, db)
     variants = await content_optimization.cross_platform_repurpose(
         source_content_id=req.source_content_id,
         target_platforms=req.target_platforms,

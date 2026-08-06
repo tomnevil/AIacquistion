@@ -1528,7 +1528,8 @@ a:hover { text-decoration:underline; }
     <div class="sidebar-section">
       <div class="sidebar-section-title">工作台</div>
       <button class="sidebar-item active" onclick="switchTabSidebar('dashboard', this)">
-        <span class="nav-icon">🏠</span> 首页看板
+        <span class="nav-icon">🏠</span> 今日工作台
+        <span class="nav-badge" id="dashboardUrgentBadge" style="display:none;background:rgba(220,38,38,0.15);color:#DC2626;font-size:10px">0</span>
       </button>
       <button class="sidebar-item" onclick="switchTabSidebar('publish', this)">
         <span class="nav-icon">✍️</span> 内容创作
@@ -1557,6 +1558,18 @@ a:hover { text-decoration:underline; }
       <button class="sidebar-item" onclick="switchTabSidebar('followup', this)">
         <span class="nav-icon">📈</span> 私域转化
       </button>
+      <button class="sidebar-item" onclick="switchTabSidebar('wecom', this)">
+        <span class="nav-icon">🏢</span> 企微承接
+        <span class="nav-badge" style="background:rgba(16,185,129,0.15);color:#059669;display:inline-flex">NEW</span>
+      </button>
+      <button class="sidebar-item" onclick="switchTabSidebar('content-asset', this)">
+        <span class="nav-icon">🗂️</span> 素材资产
+        <span class="nav-badge" style="background:rgba(99,102,241,0.15);color:#6366f1;display:inline-flex">NEW</span>
+      </button>
+      <button class="sidebar-item" onclick="switchTabSidebar('agent', this)">
+        <span class="nav-icon">🤖</span> AI 运营 Agent
+        <span class="nav-badge" id="agentApprovalBadge" style="display:none">0</span>
+      </button>
     </div>
 
     <div class="sidebar-section">
@@ -1578,12 +1591,25 @@ a:hover { text-decoration:underline; }
       <button class="sidebar-item" onclick="switchTabSidebar('data', this)">
         <span class="nav-icon">📊</span> 数据洞察
       </button>
+      <button class="sidebar-item" onclick="switchTabSidebar('attribution', this)">
+        <span class="nav-icon">💰</span> 归因 ROI
+      </button>
+      <button class="sidebar-item" onclick="switchTabSidebar('export', this)">
+        <span class="nav-icon">📤</span> 数据导出
+      </button>
+      <button class="sidebar-item" onclick="switchTabSidebar('backup', this)">
+        <span class="nav-icon">💾</span> 数据备份
+      </button>
     </div>
 
     <div class="sidebar-section">
       <div class="sidebar-section-title">资源管理</div>
       <button class="sidebar-item" onclick="switchTabSidebar('accounts', this)">
         <span class="nav-icon">📱</span> 平台账号
+      </button>
+      <button class="sidebar-item" onclick="switchTabSidebar('account-health', this)">
+        <span class="nav-icon">❤️</span> 账号健康中心
+        <span class="nav-badge" id="accountHealthBadge" style="display:none;background:rgba(220,38,38,0.15);color:#DC2626;font-size:10px">0</span>
       </button>
       <button class="sidebar-item" onclick="switchTabSidebar('templates', this)">
         <span class="nav-icon">📝</span> 素材模板
@@ -1622,7 +1648,7 @@ a:hover { text-decoration:underline; }
       <select id="leadStatusF" onchange="loadLeads()">
         <option value="">全部状态</option><option value="new">新线索</option><option value="scored">已评分</option>
         <option value="contacted">已触达</option><option value="responded">已回复</option><option value="qualified">已合格</option>
-        <option value="converted">已转化</option><option value="lost">已流失</option>
+        <option value="quoted">已报价</option><option value="converted">已转化</option><option value="lost">已流失</option>
       </select>
       <select id="leadIntentF" onchange="loadLeads()">
         <option value="">全部意向</option><option value="high">高意向</option><option value="medium">中意向</option><option value="low">低意向</option>
@@ -2085,10 +2111,19 @@ a:hover { text-decoration:underline; }
 
   <!-- 统计概览 -->
   <div class="kpi-grid" id="inboxStats" style="margin-bottom:14px">
-    <div class="kpi-card"><span class="kpi-icon">📬</span><div class="kpi-value" style="color:#DC2626" id="inboxUnreadTotal">0</div><div class="kpi-label">未读消息</div></div>
-    <div class="kpi-card"><span class="kpi-icon">🎯</span><div class="kpi-value" style="color:#059669" id="inboxLeadCount">0</div><div class="kpi-label">潜在客户</div></div>
-    <div class="kpi-card"><span class="kpi-icon">⚠️</span><div class="kpi-value" style="color:#D97706" id="inboxNegCount">0</div><div class="kpi-label">负面评价</div></div>
-    <div class="kpi-card"><span class="kpi-icon">🆕</span><div class="kpi-value" style="color:var(--primary)" id="inboxTodayNew">0</div><div class="kpi-label">今日新增</div></div>
+    <div class="kpi-card" onclick="switchInboxQueue('all')"><span class="kpi-icon">📬</span><div class="kpi-value" style="color:#DC2626" id="inboxUnreadTotal">0</div><div class="kpi-label">未读消息</div></div>
+    <div class="kpi-card" onclick="switchInboxQueue('immediate')"><span class="kpi-icon">🎯</span><div class="kpi-value" style="color:#DC2626" id="inboxLeadCount">0</div><div class="kpi-label">立即回复</div></div>
+    <div class="kpi-card" onclick="switchInboxQueue('manual')"><span class="kpi-icon">⚠️</span><div class="kpi-value" style="color:#D97706" id="inboxNegCount">0</div><div class="kpi-label">人工处理</div></div>
+    <div class="kpi-card" onclick="switchInboxQueue('ai_auto')"><span class="kpi-icon">🤖</span><div class="kpi-value" style="color:#2563EB" id="inboxAutoCount">0</div><div class="kpi-label">AI 自动回复</div></div>
+    <div class="kpi-card" onclick="switchTabSidebar('hottopics')"><span class="kpi-icon">🆕</span><div class="kpi-value" style="color:var(--primary)" id="inboxTodayNew">0</div><div class="kpi-label">今日新增</div></div>
+  </div>
+
+  <!-- P0-3: 三队列分诊标签 -->
+  <div style="display:flex;gap:8px;margin-bottom:14px">
+    <button class="btn btn-sm" id="queueTabAll" onclick="switchInboxQueue('all')" style="background:var(--primary);color:#fff">全部</button>
+    <button class="btn btn-sm" id="queueTabImmediate" onclick="switchInboxQueue('immediate')" style="border:1px solid #DC2626;color:#DC2626;background:rgba(220,38,38,0.06)">🔴 立即回复 <span id="qImmediateCount">0</span></button>
+    <button class="btn btn-sm" id="queueTabManual" onclick="switchInboxQueue('manual')" style="border:1px solid #D97706;color:#D97706;background:rgba(217,119,6,0.06)">🟡 人工处理 <span id="qManualCount">0</span></button>
+    <button class="btn btn-sm" id="queueTabAuto" onclick="switchInboxQueue('ai_auto')" style="border:1px solid #2563EB;color:#2563EB;background:rgba(37,99,235,0.06)">🟢 AI 自动 <span id="qAutoCount">0</span></button>
   </div>
 
   <div class="table-card">
@@ -2148,6 +2183,54 @@ a:hover { text-decoration:underline; }
           <div class="kpi-value" id="kpiInbox">--</div>
           <div class="kpi-label">待处理消息</div>
         </div>
+      </div>
+
+      <!-- ⭐ 今日必做 (P0-1) -->
+      <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 14px">
+        <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:var(--text)">🔔 今日必做
+          <span id="todayUrgentTotal" style="background:rgba(220,38,38,0.12);color:#DC2626;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600">0 项紧急</span>
+        </div>
+        <a onclick="loadDashboardData()" style="font-size:12px;color:var(--primary);cursor:pointer">🔄 刷新</a>
+      </div>
+      <div id="todayActionList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
+        <!-- SLA 即将到期 -->
+        <div class="panel-card" style="border-left:3px solid #F59E0B">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;color:#B45309">⏰ SLA 即将到期</div>
+            <span id="slaDueCount" style="background:rgba(245,158,11,0.12);color:#B45309;font-size:11px;padding:1px 8px;border-radius:8px;font-weight:600">0</span>
+          </div>
+          <div id="slaDueList" style="max-height:140px;overflow-y:auto"></div>
+        </div>
+        <!-- SLA 已逾期 -->
+        <div class="panel-card" style="border-left:3px solid #DC2626">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;color:#B91C1C">🚨 SLA 已逾期</div>
+            <span id="slaOverdueCount" style="background:rgba(220,38,38,0.12);color:#DC2626;font-size:11px;padding:1px 8px;border-radius:8px;font-weight:600">0</span>
+          </div>
+          <div id="slaOverdueList" style="max-height:140px;overflow-y:auto"></div>
+        </div>
+        <!-- 待审核内容 -->
+        <div class="panel-card" style="border-left:3px solid #2563EB">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;color:#1D4ED8">✅ 待审核内容</div>
+            <span id="pendingReviewCount" style="background:rgba(37,99,235,0.12);color:#1D4ED8;font-size:11px;padding:1px 8px;border-radius:8px;font-weight:600">0</span>
+          </div>
+          <div id="pendingReviewList" style="max-height:140px;overflow-y:auto"></div>
+        </div>
+        <!-- 账号健康预警 -->
+        <div class="panel-card" style="border-left:3px solid #D97706">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;color:#92400E">⚠️ 账号预警</div>
+            <span id="alertCount" style="background:rgba(217,119,6,0.12);color:#D97706;font-size:11px;padding:1px 8px;border-radius:8px;font-weight:600">0</span>
+          </div>
+          <div id="alertList" style="max-height:140px;overflow-y:auto"></div>
+        </div>
+      </div>
+
+      <!-- 今日热点机会 -->
+      <div class="section-title" style="display:flex;align-items:center;gap:8px;margin:18px 0 14px;font-size:14px;font-weight:700;color:var(--text)">🔥 今日热点机会</div>
+      <div class="panel-card">
+        <div id="todayTopicsList" style="display:flex;gap:10px;overflow-x:auto;padding:4px 0"></div>
       </div>
 
       <!-- 常用入口 -->
@@ -2862,6 +2945,790 @@ a:hover { text-decoration:underline; }
   </div>
 </div>
 
+<!-- ════════════════════════════════════════ -->
+<!-- 归因 ROI 看板 (P1-5) -->
+<!-- ════════════════════════════════════════ -->
+<div id="tab-attribution" style="display:none">
+  <div class="section-header">
+    <h2>💰 全链路归因 + ROI 看板</h2>
+    <span class="sub-desc">热点→内容→评论→私信→加好友→成交 全链路追踪</span>
+    <div style="flex:1"></div>
+    <select id="attrPeriod" onchange="loadAttributionOverview()" style="padding:6px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);font-size:13px">
+      <option value="7">近 7 天</option>
+      <option value="30" selected>近 30 天</option>
+      <option value="90">近 90 天</option>
+      <option value="365">近 1 年</option>
+    </select>
+  </div>
+
+  <!-- 汇总卡片 -->
+  <div id="attrSummary" class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px">
+    <div class="stat-card" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff">
+      <div class="stat-label" style="color:rgba(255,255,255,0.8)">总线索</div>
+      <div class="stat-value" id="attrTotalLeads" style="font-size:28px;font-weight:700">-</div>
+    </div>
+    <div class="stat-card" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff">
+      <div class="stat-label" style="color:rgba(255,255,255,0.8)">成交数</div>
+      <div class="stat-value" id="attrConverted" style="font-size:28px;font-weight:700">-</div>
+    </div>
+    <div class="stat-card" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff">
+      <div class="stat-label" style="color:rgba(255,255,255,0.8)">成交总额</div>
+      <div class="stat-value" id="attrTotalValue" style="font-size:28px;font-weight:700">-</div>
+    </div>
+    <div class="stat-card" style="background:linear-gradient(135deg,#ec4899,#be185d);color:#fff">
+      <div class="stat-label" style="color:rgba(255,255,255,0.8)">整体转化率</div>
+      <div class="stat-value" id="attrConvRate" style="font-size:28px;font-weight:700">-</div>
+    </div>
+  </div>
+
+  <!-- 全链路漏斗 -->
+  <div style="background:rgba(255,255,255,0.95);border-radius:var(--radius);padding:20px;margin-bottom:18px;border:1px solid rgba(148,163,184,0.12)">
+    <h3 style="margin:0 0 14px;font-size:16px">🔄 全链路漏斗</h3>
+    <div id="attrFunnel" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+
+  <!-- Top Performers -->
+  <div id="attrTopPerformers" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px">
+    <div style="background:rgba(255,255,255,0.95);border-radius:var(--radius);padding:16px;border:1px solid rgba(148,163,184,0.12)">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:6px">🏆 Top 渠道</div>
+      <div id="attrTopChannel" style="font-size:15px;font-weight:600">-</div>
+    </div>
+    <div style="background:rgba(255,255,255,0.95);border-radius:var(--radius);padding:16px;border:1px solid rgba(148,163,184,0.12)">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:6px">🏆 Top 内容</div>
+      <div id="attrTopContent" style="font-size:15px;font-weight:600">-</div>
+    </div>
+    <div style="background:rgba(255,255,255,0.95);border-radius:var(--radius);padding:16px;border:1px solid rgba(148,163,184,0.12)">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:6px">🏆 Top 账号</div>
+      <div id="attrTopAccount" style="font-size:15px;font-weight:600">-</div>
+    </div>
+  </div>
+
+  <!-- 子导航 -->
+  <div class="data-subnav" style="display:flex;gap:8px;border-bottom:1px solid var(--border);padding:0 0 12px;margin-bottom:18px">
+    <div class="data-nav-item active" onclick="switchAttrView('channel',this)" style="padding:8px 16px;border-radius:var(--radius-sm);font-size:14px;color:var(--primary);cursor:pointer;background:var(--bg)">按渠道</div>
+    <div class="data-nav-item" onclick="switchAttrView('content',this)" style="padding:8px 16px;border-radius:var(--radius-sm);font-size:14px;color:var(--text2);cursor:pointer">按内容</div>
+    <div class="data-nav-item" onclick="switchAttrView('account',this)" style="padding:8px 16px;border-radius:var(--radius-sm);font-size:14px;color:var(--text2);cursor:pointer">按账号</div>
+  </div>
+
+  <!-- ROI 表格 -->
+  <div id="attrChannelView">
+    <h3 style="margin:0 0 12px;font-size:16px">📈 按渠道 ROI</h3>
+    <div style="overflow-x:auto;background:rgba(255,255,255,0.95);border-radius:var(--radius);border:1px solid rgba(148,163,184,0.12)">
+      <table class="data-table" id="attrChannelTable" style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:var(--bg);text-align:left">
+            <th style="padding:10px 12px">渠道</th>
+            <th style="padding:10px 12px;text-align:right">线索</th>
+            <th style="padding:10px 12px;text-align:right">合格</th>
+            <th style="padding:10px 12px;text-align:right">成交</th>
+            <th style="padding:10px 12px;text-align:right">加好友</th>
+            <th style="padding:10px 12px;text-align:right">CPL</th>
+            <th style="padding:10px 12px;text-align:right">CPA</th>
+            <th style="padding:10px 12px;text-align:right">ROI</th>
+            <th style="padding:10px 12px;text-align:right">均分</th>
+            <th style="padding:10px 12px;text-align:right">转化率</th>
+          </tr>
+        </thead>
+        <tbody id="attrChannelBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="attrContentView" style="display:none">
+    <h3 style="margin:0 0 12px;font-size:16px">📝 按内容 ROI</h3>
+    <div style="overflow-x:auto;background:rgba(255,255,255,0.95);border-radius:var(--radius);border:1px solid rgba(148,163,184,0.12)">
+      <table class="data-table" id="attrContentTable" style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:var(--bg);text-align:left">
+            <th style="padding:10px 12px">内容预览</th>
+            <th style="padding:10px 12px">平台</th>
+            <th style="padding:10px 12px;text-align:right">浏览</th>
+            <th style="padding:10px 12px;text-align:right">互动率</th>
+            <th style="padding:10px 12px;text-align:right">线索</th>
+            <th style="padding:10px 12px;text-align:right">成交</th>
+            <th style="padding:10px 12px;text-align:right">转化率</th>
+          </tr>
+        </thead>
+        <tbody id="attrContentBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="attrAccountView" style="display:none">
+    <h3 style="margin:0 0 12px;font-size:16px">📱 按账号 ROI</h3>
+    <div style="overflow-x:auto;background:rgba(255,255,255,0.95);border-radius:var(--radius);border:1px solid rgba(148,163,184,0.12)">
+      <table class="data-table" id="attrAccountTable" style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:var(--bg);text-align:left">
+            <th style="padding:10px 12px">账号</th>
+            <th style="padding:10px 12px">平台</th>
+            <th style="padding:10px 12px;text-align:right">粉丝</th>
+            <th style="padding:10px 12px;text-align:right">线索</th>
+            <th style="padding:10px 12px;text-align:right">成交</th>
+            <th style="padding:10px 12px;text-align:right">加好友</th>
+            <th style="padding:10px 12px;text-align:right">ROI</th>
+            <th style="padding:10px 12px;text-align:right">转化率</th>
+          </tr>
+        </thead>
+        <tbody id="attrAccountBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- 企微私域承接工作台 (P1-6) -->
+<!-- ════════════════════════════════════════ -->
+<div id="tab-wecom" style="display:none">
+  <div class="section-header">
+    <h2>🏢 企微私域承接工作台</h2>
+    <span class="sub-desc">加好友自动建线索 · 欢迎语 · 打标签 · 素材群发</span>
+    <div style="flex:1"></div>
+    <button class="btn btn-outline btn-sm" onclick="showWecomSettings()" style="background:#fff;border:1.5px solid rgba(148,163,184,0.2);border-radius:var(--radius-sm);padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer">⚙️ 企微配置</button>
+  </div>
+
+  <!-- 统计卡片 -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px">
+    <div class="stat-card" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;padding:16px;border-radius:var(--radius)">
+      <div style="color:rgba(255,255,255,0.8);font-size:12px;margin-bottom:4px">客户总数</div>
+      <div id="wecomTotalContacts" style="font-size:26px;font-weight:700">-</div>
+      <div id="wecomTodayNew" style="font-size:11px;opacity:0.9;margin-top:4px">今日新增 -</div>
+    </div>
+    <div class="stat-card" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;padding:16px;border-radius:var(--radius)">
+      <div style="color:rgba(255,255,255,0.8);font-size:12px;margin-bottom:4px">活码转化</div>
+      <div id="wecomCodeRate" style="font-size:26px;font-weight:700">-</div>
+      <div id="wecomCodeStats" style="font-size:11px;opacity:0.9;margin-top:4px">扫码 - / 添加 -</div>
+    </div>
+    <div class="stat-card" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:16px;border-radius:var(--radius)">
+      <div style="color:rgba(255,255,255,0.8);font-size:12px;margin-bottom:4px">群发任务</div>
+      <div id="wecomMassTotal" style="font-size:26px;font-weight:700">-</div>
+      <div id="wecomMassSent" style="font-size:11px;opacity:0.9;margin-top:4px">已发送 -</div>
+    </div>
+    <div class="stat-card" style="background:linear-gradient(135deg,#ec4899,#be185d);color:#fff;padding:16px;border-radius:var(--radius)">
+      <div style="color:rgba(255,255,255,0.8);font-size:12px;margin-bottom:4px">成交转化率</div>
+      <div id="wecomConvRate" style="font-size:26px;font-weight:700">-</div>
+      <div id="wecomFunnel" style="font-size:11px;opacity:0.9;margin-top:4px">加好友 - → 成交 -</div>
+    </div>
+  </div>
+
+  <!-- 子导航 -->
+  <div class="data-subnav" style="display:flex;gap:8px;border-bottom:1px solid var(--border);padding:0 0 12px;margin-bottom:18px">
+    <div class="data-nav-item active" onclick="switchWecomView('livecode',this)" style="padding:8px 16px;border-radius:var(--radius-sm);font-size:14px;color:var(--primary);cursor:pointer;background:var(--bg)">🏷️ 活码管理</div>
+    <div class="data-nav-item" onclick="switchWecomView('contacts',this)" style="padding:8px 16px;border-radius:var(--radius-sm);font-size:14px;color:var(--text2);cursor:pointer">👥 客户联系</div>
+    <div class="data-nav-item" onclick="switchWecomView('welcome',this)" style="padding:8px 16px;border-radius:var(--radius-sm);font-size:14px;color:var(--text2);cursor:pointer">💬 欢迎语</div>
+    <div class="data-nav-item" onclick="switchWecomView('mass',this)" style="padding:8px 16px;border-radius:var(--radius-sm);font-size:14px;color:var(--text2);cursor:pointer">📢 素材群发</div>
+    <div style="flex:1"></div>
+    <button class="btn btn-primary btn-sm" onclick="showAddLiveCodeModal()" style="background:var(--primary);color:#fff;border:none;padding:7px 14px;border-radius:var(--radius-sm);font-size:12px;cursor:pointer">+ 新建活码</button>
+  </div>
+
+  <!-- 活码管理视图 -->
+  <div id="wecomLiveCodeView">
+    <div style="overflow-x:auto;background:rgba(255,255,255,0.95);border-radius:var(--radius);border:1px solid rgba(148,163,184,0.12)">
+      <table class="data-table" style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:var(--bg);text-align:left">
+            <th style="padding:10px 12px">活码名称</th>
+            <th style="padding:10px 12px">来源平台</th>
+            <th style="padding:10px 12px">二维码</th>
+            <th style="padding:10px 12px;text-align:right">扫码</th>
+            <th style="padding:10px 12px;text-align:right">添加</th>
+            <th style="padding:10px 12px;text-align:right">转化率</th>
+            <th style="padding:10px 12px;text-align:center">操作</th>
+          </tr>
+        </thead>
+        <tbody id="wecomLiveCodeBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 客户联系视图 -->
+  <div id="wecomContactsView" style="display:none">
+    <div style="overflow-x:auto;background:rgba(255,255,255,0.95);border-radius:var(--radius);border:1px solid rgba(148,163,184,0.12)">
+      <table class="data-table" style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:var(--bg);text-align:left">
+            <th style="padding:10px 12px">客户昵称</th>
+            <th style="padding:10px 12px">企业</th>
+            <th style="padding:10px 12px">标签</th>
+            <th style="padding:10px 12px">来源</th>
+            <th style="padding:10px 12px">加好友时间</th>
+            <th style="padding:10px 12px;text-align:center">关联线索</th>
+          </tr>
+        </thead>
+        <tbody id="wecomContactsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 欢迎语视图 -->
+  <div id="wecomWelcomeView" style="display:none">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px" id="wecomWelcomeGrid"></div>
+  </div>
+
+  <!-- 群发视图 -->
+  <div id="wecomMassView" style="display:none">
+    <div style="margin-bottom:12px">
+      <button class="btn btn-primary" onclick="showAddMassModal()" style="background:var(--primary);color:#fff;border:none;padding:8px 16px;border-radius:var(--radius-sm);font-size:13px;cursor:pointer">+ 新建群发</button>
+    </div>
+    <div style="overflow-x:auto;background:rgba(255,255,255,0.95);border-radius:var(--radius);border:1px solid rgba(148,163,184,0.12)">
+      <table class="data-table" style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:var(--bg);text-align:left">
+            <th style="padding:10px 12px">任务名称</th>
+            <th style="padding:10px 12px">内容预览</th>
+            <th style="padding:10px 12px;text-align:right">目标</th>
+            <th style="padding:10px 12px;text-align:right">已发</th>
+            <th style="padding:10px 12px;text-align:center">状态</th>
+            <th style="padding:10px 12px;text-align:center">操作</th>
+          </tr>
+        </thead>
+        <tbody id="wecomMassBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- 素材资产库 (P1-7) -->
+<!-- ════════════════════════════════════════ -->
+<div id="tab-content-asset" style="display:none">
+  <div class="section-header">
+    <h2>🗂️ 素材资产库</h2>
+    <span class="sub-desc">版本管理 · A/B 效果 · 一键套用 · 模板市场</span>
+    <div style="flex:1"></div>
+    <button class="btn btn-outline btn-sm" onclick="seedMarketTemplates()" style="background:#fff;border:1.5px solid rgba(148,163,184,0.2);border-radius:var(--radius-sm);padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer">🏪 初始化市场模板</button>
+  </div>
+
+  <!-- 统计卡片 -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px">
+    <div class="stat-card" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;padding:16px;border-radius:var(--radius)">
+      <div style="color:rgba(255,255,255,0.8);font-size:12px;margin-bottom:4px">我的模板</div>
+      <div id="caTotalTemplates" style="font-size:26px;font-weight:700">-</div>
+      <div id="caTotalVariants" style="font-size:11px;opacity:0.9;margin-top:4px">变体 -</div>
+    </div>
+    <div class="stat-card" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;padding:16px;border-radius:var(--radius)">
+      <div style="color:rgba(255,255,255,0.8);font-size:12px;margin-bottom:4px">A/B 发送总数</div>
+      <div id="caAbSent" style="font-size:26px;font-weight:700">-</div>
+      <div id="caAbReply" style="font-size:11px;opacity:0.9;margin-top:4px">回复 - · 回复率 -</div>
+    </div>
+    <div class="stat-card" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:16px;border-radius:var(--radius)">
+      <div style="color:rgba(255,255,255,0.8);font-size:12px;margin-bottom:4px">带来线索</div>
+      <div id="caAbLead" style="font-size:26px;font-weight:700">-</div>
+      <div id="caAbConv" style="font-size:11px;opacity:0.9;margin-top:4px">成交 - · 转化率 -</div>
+    </div>
+    <div class="stat-card" style="background:linear-gradient(135deg,#ec4899,#be185d);color:#fff;padding:16px;border-radius:var(--radius)">
+      <div style="color:rgba(255,255,255,0.8);font-size:12px;margin-bottom:4px">市场模板</div>
+      <div id="caMarketCount" style="font-size:26px;font-weight:700">-</div>
+      <div style="font-size:11px;opacity:0.9;margin-top:4px">可 fork 使用</div>
+    </div>
+  </div>
+
+  <!-- 子导航 -->
+  <div class="data-subnav" style="display:flex;gap:8px;border-bottom:1px solid var(--border);padding:0 0 12px;margin-bottom:18px">
+    <div class="data-nav-item active" onclick="switchContentView('mine',this)" style="padding:8px 16px;border-radius:var(--radius-sm);font-size:14px;color:var(--primary);cursor:pointer;background:var(--bg)">📝 我的素材</div>
+    <div class="data-nav-item" onclick="switchContentView('abtest',this)" style="padding:8px 16px;border-radius:var(--radius-sm);font-size:14px;color:var(--text2);cursor:pointer">🧪 A/B 测试</div>
+    <div class="data-nav-item" onclick="switchContentView('market',this)" style="padding:8px 16px;border-radius:var(--radius-sm);font-size:14px;color:var(--text2);cursor:pointer">🏪 模板市场</div>
+    <div class="data-nav-item" onclick="switchContentView('rank',this)" style="padding:8px 16px;border-radius:var(--radius-sm);font-size:14px;color:var(--text2);cursor:pointer">📊 效果排行</div>
+    <div style="flex:1"></div>
+    <button class="btn btn-primary btn-sm" onclick="showCreateTemplateModal()" style="background:var(--primary);color:#fff;border:none;padding:7px 14px;border-radius:var(--radius-sm);font-size:12px;cursor:pointer">+ 新建模板</button>
+  </div>
+
+  <!-- 我的素材视图 -->
+  <div id="caMineView">
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <select id="caFilterPlatform" onchange="loadMyTemplates()" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px">
+        <option value="">全部平台</option>
+      </select>
+      <select id="caFilterIndustry" onchange="loadMyTemplates()" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px">
+        <option value="">全部行业</option>
+      </select>
+      <input type="text" id="caSearch" placeholder="🔍 搜索模板内容/标签..." style="flex:1;min-width:200px;padding:6px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px" oninput="loadMyTemplates()">
+    </div>
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>平台</th><th>分类</th><th>内容预览</th><th>行业</th>
+            <th>版本</th><th>A/B发送</th><th>回复率</th><th>转化率</th><th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="caTemplateBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- A/B 测试视图 -->
+  <div id="caAbtestView" style="display:none">
+    <div style="background:var(--bg);padding:14px;border-radius:var(--radius);margin-bottom:14px;font-size:13px;color:var(--text2)">
+      💡 选择一个父模板，查看其原版与各变体的回复率/线索/成交对比，系统自动推荐胜出版本。
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="font-size:13px;color:var(--text2);margin-right:8px">选择父模板：</label>
+      <select id="caAbTestSelect" onchange="loadAbStats()" style="min-width:300px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px">
+        <option value="">请选择...</option>
+      </select>
+    </div>
+    <div id="caAbStatsResult"></div>
+  </div>
+
+  <!-- 模板市场视图 -->
+  <div id="caMarketView" style="display:none">
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <select id="caMarketIndustry" onchange="loadMarketTemplates()" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px">
+        <option value="">全部行业</option>
+      </select>
+      <select id="caMarketPlatform" onchange="loadMarketTemplates()" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px">
+        <option value="">全部平台</option>
+      </select>
+      <input type="text" id="caMarketSearch" placeholder="🔍 搜索市场模板..." style="flex:1;min-width:200px;padding:6px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px" oninput="loadMarketTemplates()">
+    </div>
+    <div id="caMarketGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px"></div>
+  </div>
+
+  <!-- 效果排行视图 -->
+  <div id="caRankView" style="display:none">
+    <div style="margin-bottom:12px">
+      <label style="font-size:13px;color:var(--text2);margin-right:8px">排序指标：</label>
+      <select id="caRankMetric" onchange="loadLeaderboard()" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px">
+        <option value="reply_rate">回复率</option>
+        <option value="lead_rate">线索率</option>
+        <option value="convert_rate">成交转化率</option>
+        <option value="sent_count">发送数量</option>
+      </select>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead>
+          <tr><th>排名</th><th>平台</th><th>内容预览</th><th>变体</th><th>发送</th><th>回复</th><th>回复率</th><th>线索</th><th>成交</th><th>转化率</th></tr>
+        </thead>
+        <tbody id="caRankBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- AI 运营 Agent (P2-8) -->
+<!-- ════════════════════════════════════════ -->
+<div id="tab-agent" style="display:none">
+  <div class="section-header">
+    <h2>🤖 AI 运营 Agent</h2>
+    <span class="sub-desc">风控阈值内全自动跑"发现→生成→执行→跟进"，异常才升级人工 · 7×24 自动获客团队</span>
+    <div style="flex:1"></div>
+    <button class="btn btn-primary btn-sm" onclick="showAgentCreateModal()" style="background:#6366f1;color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer">+ 新建 Agent</button>
+  </div>
+
+  <!-- 看板卡片 -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px">
+    <div class="stat-card" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;padding:16px;border-radius:var(--radius)">
+      <div style="color:rgba(255,255,255,0.8);font-size:12px;margin-bottom:4px">Agent 总数</div>
+      <div id="agTotalAgents" style="font-size:26px;font-weight:700">-</div>
+      <div id="agActiveAgents" style="font-size:11px;opacity:0.9;margin-top:4px">运行中 -</div>
+    </div>
+    <div class="stat-card" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:16px;border-radius:var(--radius)">
+      <div style="color:rgba(255,255,255,0.8);font-size:12px;margin-bottom:4px">待审批</div>
+      <div id="agPendingApprovals" style="font-size:26px;font-weight:700">-</div>
+      <div style="font-size:11px;opacity:0.9;margin-top:4px">需人工处理</div>
+    </div>
+    <div class="stat-card" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;padding:16px;border-radius:var(--radius)">
+      <div style="color:rgba(255,255,255,0.8);font-size:12px;margin-bottom:4px">7天自动执行</div>
+      <div id="agAuto7d" style="font-size:26px;font-weight:700">-</div>
+      <div id="agEscalated7d" style="font-size:11px;opacity:0.9;margin-top:4px">升级 -</div>
+    </div>
+    <div class="stat-card" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;padding:16px;border-radius:var(--radius)">
+      <div style="color:rgba(255,255,255,0.8);font-size:12px;margin-bottom:4px">7天漏斗</div>
+      <div id="agFunnel" style="font-size:13px;font-weight:600;line-height:1.7">-</div>
+    </div>
+  </div>
+
+  <!-- 子导航 -->
+  <div class="data-subnav" style="display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:0">
+    <div class="data-nav-item active" onclick="switchAgentView('agents',this)" style="padding:8px 16px;border-radius:var(--radius-sm) var(--radius-sm) 0 0;font-size:14px;color:var(--primary);cursor:pointer;border-bottom:2px solid var(--primary);font-weight:600">🤖 我的 Agent</div>
+    <div class="data-nav-item" onclick="switchAgentView('approvals',this)" style="padding:8px 16px;border-radius:var(--radius-sm) var(--radius-sm) 0 0;font-size:14px;color:var(--text2);cursor:pointer">📋 审批队列 <span id="agApprovalNavBadge" style="display:none;background:#f59e0b;color:#fff;border-radius:10px;padding:0 6px;font-size:10px;margin-left:4px">0</span></div>
+    <div class="data-nav-item" onclick="switchAgentView('runs',this)" style="padding:8px 16px;border-radius:var(--radius-sm) var(--radius-sm) 0 0;font-size:14px;color:var(--text2);cursor:pointer">📜 运行历史</div>
+  </div>
+
+  <!-- 我的 Agent 视图 -->
+  <div id="agView-agents">
+    <div id="agAgentsBody" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px"></div>
+  </div>
+
+  <!-- 审批队列视图 -->
+  <div id="agView-approvals" style="display:none">
+    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+      <select id="agApprovalFilter" onchange="loadAgentApprovals()" style="padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--card);color:var(--text)">
+        <option value="pending">待处理</option>
+        <option value="approved">已通过</option>
+        <option value="rejected">已驳回</option>
+      </select>
+      <select id="agApprovalRisk" onchange="loadAgentApprovals()" style="padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--card);color:var(--text)">
+        <option value="">全部风险</option>
+        <option value="high">高风险</option>
+        <option value="medium">中风险</option>
+        <option value="low">低风险</option>
+      </select>
+    </div>
+    <div id="agApprovalsBody"></div>
+  </div>
+
+  <!-- 运行历史视图 -->
+  <div id="agView-runs" style="display:none">
+    <div id="agRunsBody"></div>
+  </div>
+</div>
+
+<!-- 弹窗：新建/编辑 Agent -->
+<div id="agentModal" class="modal" style="display:none">
+  <div class="modal-content" style="max-width:560px">
+    <div class="modal-header">
+      <h3 id="agentModalTitle">新建 AI 运营 Agent</h3>
+      <button class="modal-close" onclick="closeAgentModal()">×</button>
+    </div>
+    <div class="modal-body" style="padding:16px;max-height:70vh;overflow-y:auto">
+      <input type="hidden" id="agEditId">
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">名称 *</label>
+        <input type="text" id="agName" placeholder="如：电商获客自动化" style="width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--card);color:var(--text)">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">运行模式</label>
+        <select id="agMode" style="width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--card);color:var(--text)">
+          <option value="approval_required">审批模式（生成后入审批队列，推荐）</option>
+          <option value="auto_pilot">全自动模式（异常才升级人工）</option>
+          <option value="paused">暂停</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div>
+          <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">运行间隔（分钟）</label>
+          <input type="number" id="agInterval" value="60" min="5" style="width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--card);color:var(--text)">
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">最低热点分</label>
+          <input type="number" id="agMinScore" value="60" step="5" style="width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--card);color:var(--text)">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+        <div>
+          <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">每次选题数</label>
+          <input type="number" id="agMaxTopics" value="5" min="1" style="width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--card);color:var(--text)">
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">每次发布数</label>
+          <input type="number" id="agMaxPublish" value="3" min="1" style="width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--card);color:var(--text)">
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">每次跟进数</label>
+          <input type="number" id="agMaxFollowups" value="10" min="1" style="width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--card);color:var(--text)">
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">目标平台（多选，留空=全部）</label>
+        <div id="agPlatforms" style="display:flex;flex-wrap:wrap;gap:6px">
+          <label style="font-size:12px;display:flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer"><input type="checkbox" value="zhihu" style="width:auto"> 知乎</label>
+          <label style="font-size:12px;display:flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer"><input type="checkbox" value="xiaohongshu" style="width:auto"> 小红书</label>
+          <label style="font-size:12px;display:flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer"><input type="checkbox" value="weibo" style="width:auto"> 微博</label>
+          <label style="font-size:12px;display:flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer"><input type="checkbox" value="bilibili" style="width:auto"> B站</label>
+          <label style="font-size:12px;display:flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer"><input type="checkbox" value="douyin" style="width:auto"> 抖音</label>
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">阶段开关</label>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="agStageDiscover" checked style="width:auto"> 发现</label>
+          <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="agStageGenerate" checked style="width:auto"> 生成</label>
+          <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="agStageExecute" checked style="width:auto"> 执行</label>
+          <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="agStageFollowup" checked style="width:auto"> 跟进</label>
+        </div>
+      </div>
+      <div style="margin-bottom:12px;display:flex;gap:12px;flex-wrap:wrap">
+        <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="agAutoPublish" style="width:auto"> 自动发布（否则入审批）</label>
+        <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="agActive" style="width:auto"> 立即启用</label>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Webhook 通知地址（飞书/企微/钉钉，可选）</label>
+        <input type="text" id="agWebhook" placeholder="https://open.feishu.cn/..." style="width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--card);color:var(--text)">
+      </div>
+    </div>
+    <div class="modal-footer" style="padding:12px 16px;display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--border)">
+      <button class="btn btn-outline" onclick="closeAgentModal()" style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 16px;font-size:13px;cursor:pointer">取消</button>
+      <button class="btn btn-primary" onclick="saveAgent()" style="background:#6366f1;color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：运行历史详情（决策审计） -->
+<div id="agentRunDetailModal" class="modal" style="display:none">
+  <div class="modal-content" style="max-width:820px">
+    <div class="modal-header">
+      <h3 id="agRunDetailTitle">运行详情</h3>
+      <button class="modal-close" onclick="document.getElementById('agentRunDetailModal').style.display='none'">×</button>
+    </div>
+    <div class="modal-body" style="padding:16px;max-height:70vh;overflow-y:auto">
+      <div id="agRunDetailBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- 账号健康中心 (P0-2) -->
+<!-- ════════════════════════════════════════ -->
+<div id="tab-account-health" style="display:none">
+  <div class="section-header">
+    <h2>❤️ 账号健康中心</h2>
+    <span class="sub-desc">实时监控账号安全状态，防封号、防限流</span>
+  </div>
+
+  <!-- 顶部总览 -->
+  <div id="healthOverview" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">
+    <div class="panel-card" style="text-align:center;padding:16px">
+      <div style="font-size:32px;font-weight:800" id="avgHealthScore">--</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">平均健康分</div>
+    </div>
+    <div class="panel-card" style="text-align:center;padding:16px">
+      <div style="font-size:32px;font-weight:800;color:#10B981" id="gradeA">0</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">A级账号</div>
+    </div>
+    <div class="panel-card" style="text-align:center;padding:16px">
+      <div style="font-size:32px;font-weight:800;color:#F59E0B" id="gradeBC">0</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">B/C级</div>
+    </div>
+    <div class="panel-card" style="text-align:center;padding:16px">
+      <div style="font-size:32px;font-weight:800;color:#DC2626" id="gradeDF">0</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">D/F级 风险</div>
+    </div>
+    <div class="panel-card" style="text-align:center;padding:16px">
+      <div style="font-size:32px;font-weight:800;color:#D97706" id="alertTotal">0</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">活跃预警</div>
+    </div>
+  </div>
+
+  <!-- 预警统计 -->
+  <div class="panel-card" style="margin-bottom:16px;padding:14px">
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <div><span style="color:#DC2626;font-weight:700" id="alertBanned">0</span> 封禁</div>
+      <div><span style="color:#F59E0B;font-weight:700" id="alertRestricted">0</span> 限流</div>
+      <div><span style="color:#D97706;font-weight:700" id="alertQuota">0</span> 配额告急</div>
+      <div><span style="color:#7C3AED;font-weight:700" id="alertHighRisk">0</span> 高风险</div>
+    </div>
+  </div>
+
+  <!-- 账号健康列表 -->
+  <div class="section-title" style="margin-bottom:10px;font-size:14px;font-weight:700">📊 账号健康详情</div>
+  <div class="table-card">
+    <table>
+      <thead><tr>
+        <th>账号</th>
+        <th>平台</th>
+        <th>状态</th>
+        <th>健康分</th>
+        <th>等级</th>
+        <th>配额使用</th>
+        <th>风险事件</th>
+        <th>操作</th>
+      </tr></thead>
+      <tbody id="accountHealthTbody"></tbody>
+    </table>
+  </div>
+
+  <!-- 风险事件时间线 -->
+  <div class="section-title" style="margin:18px 0 10px;font-size:14px;font-weight:700">📅 风险事件时间线</div>
+  <div class="panel-card" style="max-height:300px;overflow-y:auto" id="riskTimeline">
+    <div style="color:var(--text2);font-size:13px;text-align:center;padding:30px">加载中...</div>
+  </div>
+</div><!-- /#tab-account-health -->
+
+<div id="tab-export" style="display:none">
+  <!-- ════════════════════════════════════════ -->
+  <!-- 数据导出 -->
+  <!-- ════════════════════════════════════════ -->
+  <!-- 页面标题区域 -->
+  <div class="section-header">
+    <h2 style="margin:0 0 8px 0;color:#1e293b;font-size:1.5rem;font-weight:700">📤 数据导出</h2>
+    <span style="color:#64748b;font-size:0.9rem;display:block">一键导出全部线索/内容/报表（Excel/CSV/PDF），满足数据安全管理需求</span>
+    <div style="flex:1"></div>
+  </div>
+
+  <!-- 导出功能卡片区 -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:24px">
+    
+    <!-- 线索导出卡片 -->
+    <div class="panel-card" style="background:#fff;padding:20px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e2e8f0">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <div style="font-size:24px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:#fef3c7;border-radius:8px">🎯</div>
+        <div style="flex:1">
+          <div style="font-weight:700;color:#1e293b;margin-bottom:2px">线索数据</div>
+          <div style="font-size:12px;color:#64748b">客户信息、评分、转化记录</div>
+        </div>
+      </div>
+      
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn" onclick="alert('导出线索数据 (CSV 格式)')" style="border:1px solid #e2e8f0;background:#fff;color:#475569;border-radius:6px;padding:8px 12px;font-size:13px;display:flex;align-items:center;gap:6px;flex:1;min-width:0;justify-content:center">
+          📄 CSV
+        </button>
+        <button class="btn" onclick="alert('导出线索数据 (Excel 格式)')" style="border:none;background:#3b82f6;color:#fff;border-radius:6px;padding:8px 12px;font-size:13px;display:flex;align-items:center;gap:6px;flex:1;min-width:0;justify-content:center">
+          📊 Excel
+        </button>
+        <button class="btn" onclick="alert('导出线索数据 (PDF 格式)')" style="border:none;background:#64748b;color:#fff;border-radius:6px;padding:8px 12px;font-size:13px;display:flex;align-items:center;gap:6px;flex:1;min-width:0;justify-content:center">
+          📋 PDF
+        </button>
+      </div>
+      
+      <div style="margin-top:12px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#64748b;cursor:pointer;padding:6px 8px;background:#f8fafc;border-radius:4px">
+          <input type="checkbox" id="exportLeadsSelected" onchange="console.log('仅导出选中线索:', this.checked)" style="margin:0"> 
+          <span>仅导出选中线索</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- 内容导出卡片 -->
+    <div class="panel-card" style="background:#fff;padding:20px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e2e8f0">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <div style="font-size:24px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:#dbeafe;border-radius:8px">📝</div>
+        <div style="flex:1">
+          <div style="font-weight:700;color:#1e293b;margin-bottom:2px">内容数据</div>
+          <div style="font-size:12px;color:#64748b">素材库、内容表现、A/B测试</div>
+        </div>
+      </div>
+      
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn" onclick="alert('导出内容数据 (Excel 报表)')" style="border:none;background:#3b82f6;color:#fff;border-radius:6px;padding:8px 16px;font-size:13px;display:flex;align-items:center;gap:8px;flex:1;justify-content:center">
+          📊 Excel 报表
+        </button>
+      </div>
+      <div style="font-size:11px;color:#94a3b8;line-height:1.4;padding:8px;background:#f8fafc;border-radius:4px">
+        包含内容素材和使用统计数据，支持多sheet导出，便于深入分析
+      </div>
+    </div>
+
+    <!-- 报表导出卡片 -->
+    <div class="panel-card" style="background:#fff;padding:20px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e2e8f0">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <div style="font-size:24px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:#fef3c7;border-radius:8px">📊</div>
+        <div style="flex:1">
+          <div style="font-weight:700;color:#1e293b;margin-bottom:2px">分析报表</div>
+          <div style="font-size:12px;color:#64748b">转化漏斗、平台统计、ROI分析</div>
+        </div>
+      </div>
+      
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn" onclick="alert('导出分析报表 (Excel 格式)')" style="border:none;background:#3b82f6;color:#fff;border-radius:6px;padding:8px 16px;font-size:13px;display:flex;align-items:center;gap:8px;flex:1;justify-content:center">
+          📊 数据报表
+        </button>
+      </div>
+      <div style="font-size:11px;color:#94a3b8;line-height:1.4;padding:8px;background:#f8fafc;border-radius:4px">
+        综合统计分析，包含转化漏斗和多维度对比分析，助力数据驱动决策
+      </div>
+    </div>
+  </div>
+
+  <!-- 页脚区域 -->
+  <div class="panel-card" style="background:#fff;padding:20px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border:1px solid #e2e8f0">
+    <div style="display:flex;align-items:center;gap:16px">
+      <div style="font-size:32px">🛡️</div>
+      <div style="font-size:13px;line-height:1.6;color:#475569">
+        <strong style="color:#1e293b">数据安全保障：</strong> 一键导出让您随时掌控数据，多格式导出满足不同场景需求，
+        支持Excel/CSV/PDF三种主流格式，让您的数据分析更灵活高效。
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 数据备份标签页 - 完整实现 -->
+<div id="tab-backup" style="display:none">
+  <!-- 页面标题区域 -->
+  <div class="section-header">
+    <h2 style="margin:0 0 8px 0;color:#1e293b;font-size:1.5rem;font-weight:700">💾 数据备份</h2>
+    <span style="color:#64748b;font-size:0.9rem;display:block">定时自动备份，客户数据安全感是B端产品的隐形刚需</span>
+    <div style="flex:1"></div>
+      <button class="btn btn-primary btn-sm" onclick="manualBackup()" style="background:#10b981;color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 16px;font-weight:600;cursor:pointer">🔄 立即备份</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:24px">
+      <div class="panel-card">
+        <div style="font-weight:700;margin-bottom:16px;color:var(--text)">⚙️ 自动备份配置</div>
+        <div style="display:grid;gap:12px">
+          <div>
+            <label style="font-size:13px;color:var(--text2);display:block;margin-bottom:6px">启用自动备份</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 12px;border-radius:var(--radius-sm);background:var(--bg)">
+              <input type="checkbox" id="backupEnabled" onchange="updateBackupConfig()" style="width:auto">
+              <span style="font-size:13px;color:var(--text)">定期自动备份我的数据</span>
+            </label>
+          </div>
+          <div>
+            <label style="font-size:13px;color:var(--text2);display:block;margin-bottom:6px">备份时间</label>
+            <input type="time" id="backupTime" value="02:00" onchange="updateBackupConfig()" style="width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--card);color:var(--text)">
+          </div>
+                    <div>
+                        <label style="font-size:13px;color:var(--text2);display:block;margin-bottom:6px">备份频率</label>
+                        <select id="backupFrequency" onchange="updateBackupConfig()" style="width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--card);color:var(--text)">
+                            <option value="1">每天</option>
+                            <option value="3">每3天</option>
+                            <option value="7">每周</option>
+                            <option value="14">每2周</option>
+                            <option value="30">每月</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:13px;color:var(--text2);display:block;margin-bottom:6px">保留天数</label>
+                        <select id="backupRetention" onchange="updateBackupConfig()" style="width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--card);color:var(--text)">
+                            <option value="7">7天</option>
+                            <option value="14">14天</option>
+                            <option value="30">30天</option>
+                            <option value="60">60天</option>
+                            <option value="90">90天</option>
+                        </select>
+                    </div>
+        </div>
+      </div>
+
+      <div class="panel-card">
+        <div style="font-weight:700;margin-bottom:16px;color:var(--text)">📊 备份状态</div>
+        <div style="display:grid;gap:12px;font-size:13px">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg);border-radius:var(--radius-sm)">
+            <span style="color:var(--text2)">状态</span>
+            <span id="backupStatus" style="font-weight:600;color:#10b981">已启用</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg);border-radius:var(--radius-sm)">
+            <span style="color:var(--text2)">最后备份</span>
+            <span id="lastBackup" style="font-weight:600;color:var(--text)">-</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg);border-radius:var(--radius-sm)">
+            <span style="color:var(--text2)">下次备份</span>
+            <span id="nextBackup" style="font-weight:600;color:var(--text)">-</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg);border-radius:var(--radius-sm)">
+            <span style="color:var(--text2)">备份文件数</span>
+            <span id="backupCount" style="font-weight:600;color:var(--primary)">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-card" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="font-weight:700;color:var(--text)">📦 备份历史</div>
+        <button class="btn btn-outline btn-sm" onclick="refreshBackupList()" style="padding:4px 12px;font-size:12px">🔄 刷新</button>
+      </div>
+      <div id="backupList" style="max-height:400px;overflow-y:auto">
+        <div style="color:var(--text2);text-align:center;padding:40px;font-style:italic">加载中...</div>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <div style="display:flex;align-items:center;gap:16px">
+        <span style="font-size:20px">🛡️</span>
+        <div style="font-size:14px;line-height:1.6;color:var(--text2)">
+          <strong>备份说明：</strong> 系统会在指定时间自动备份您的所有数据（线索、内容、配置等），
+          备份文件保留90天。您可以随时手动下载或删除备份文件。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /#tab-backup -->
+
 </div><!-- /.main-content -->
 </div><!-- /.container -->
 
@@ -2894,6 +3761,7 @@ const HOT_API = '/api/hot-topics';
 const FU_API = '/api/follow-ups';
 const OPT_API = '/api/optimization';
 const COMP_API = '/api/competitor';
+const EXPORT_API = '/api/export';
 
 let authToken = localStorage.getItem('auth_token');
 let currentUser = null;
@@ -3190,7 +4058,7 @@ function switchTabSidebar(tab, el) {
   currentTab = tab;
   document.querySelectorAll('.sidebar-item').forEach(function(t){ t.classList.remove('active'); });
   if (el) el.classList.add('active');
-  ['leads','accounts','tasks','templates','topics','knowledge','dashboard','inbox','publish','data','review','video','team','hottopics','followup','optimization','competitor'].forEach(function(t){
+  ['leads','accounts','tasks','templates','topics','knowledge','dashboard','inbox','publish','data','review','video','team','hottopics','followup','optimization','competitor','account-health','attribution','wecom','content-asset','agent','export','backup'].forEach(function(t){
     var div = document.getElementById('tab-'+t);
     if (div) div.style.display = t===tab ? 'block' : 'none';
   });
@@ -3198,6 +4066,7 @@ function switchTabSidebar(tab, el) {
   if (window.innerWidth <= 768) closeMobileSidebar();
   if(tab==='dashboard') { loadDashboardData(); }
   else if(tab==='accounts') loadAccounts();
+  else if(tab==='account-health') { loadAccountHealth(); }
   else if(tab==='tasks') { loadTasks(); loadAccountOptions(); }
   else if(tab==='templates') loadTemplates();
   else if(tab==='leads') loadLeads();
@@ -3213,6 +4082,12 @@ function switchTabSidebar(tab, el) {
   else if(tab==='followup') { loadFollowUpLeads(); }
   else if(tab==='optimization') { loadOptimizationReport(); }
   else if(tab==='competitor') { loadCompetitorPage(); }
+  else if(tab==='attribution') { loadAttributionOverview(); }
+  else if(tab==='wecom') { loadWecomDashboard(); }
+  else if(tab==='content-asset') { loadContentAssetDashboard(); }
+  else if(tab==='agent') { loadAgentDashboard(); }
+  else if(tab==='export') { loadExportPage(); }
+  else if(tab==='backup') { loadBackupPage(); }
 }
 
 // ── Sidebar Toggle ──
@@ -4112,6 +4987,7 @@ const KANBAN_COLS = [
   { key: 'contacted', label: '📞 已触达', color: '#FEF3C7' },
   { key: 'responded', label: '💬 已回复', color: '#FCE7F3' },
   { key: 'qualified', label: '⭐ 已合格', color: '#D1FAE5' },
+  { key: 'quoted', label: '💰 已报价', color: '#EDE9FE' },
   { key: 'converted', label: '✅ 已转化', color: '#BBF7D0' },
   { key: 'lost', label: '❌ 已流失', color: '#FEE2E2' }
 ];
@@ -4199,6 +5075,9 @@ async function loadDashboardData(){
     setEle('ssPublished', pr ? (pr.daily_ops ? pr.daily_ops.publishes||0 : 0) : '--');
     setEle('ssMessages', lr ? lr.total_leads||0 : '--');
 
+    // ── 今日必做 (P0-1) ──
+    loadTodayActionList();
+
     // ── 核心指标卡片 ──
     var cards = document.getElementById('dashboardCards');
     if (cards) {
@@ -4279,6 +5158,208 @@ async function loadDashboardData(){
 // ── 工具函数 ──
 function setKPICard(id, val) { var el = document.getElementById(id); if(el) el.textContent = val; }
 function setEle(id, val) { var el = document.getElementById(id); if(el) el.textContent = val; }
+
+// ════════════════════════════════════════
+// P0-1: 今日工作台 — 加载今日必做数据
+// ════════════════════════════════════════
+async function loadTodayActionList(){
+  try {
+    var data = await apiFetch(API+'/dashboard/today');
+    if (!data) return;
+
+    // SLA 即将到期
+    var slaDue = data.sla_due || [];
+    setEle('slaDueCount', slaDue.length);
+    var slaDueHtml = slaDue.length === 0
+      ? '<div style="color:var(--text2);font-size:12px;text-align:center;padding:12px 0">🎉 暂无即将到期线索</div>'
+      : slaDue.map(function(l){
+          var remaining = l.hours_remaining !== null ? l.hours_remaining + 'h' : '--';
+          var urgent = l.hours_remaining !== null && l.hours_remaining <= 4;
+          return '<div style="padding:6px 0;border-bottom:1px solid rgba(148,163,184,0.08);display:flex;justify-content:space-between;align-items:center">'
+            + '<div style="font-size:12px"><b>'+safeHTML(l.name)+'</b><span style="color:var(--text2)"> · '+safeHTML(l.company||'')+'</span></div>'
+            + '<span style="font-size:11px;color:'+(urgent?'#DC2626':'#B45309')+';font-weight:600">'+remaining+'</span></div>';
+        }).join('');
+    document.getElementById('slaDueList').innerHTML = slaDueHtml;
+
+    // SLA 已逾期
+    var overdue = data.sla_overdue || [];
+    setEle('slaOverdueCount', overdue.length);
+    var overdueHtml = overdue.length === 0
+      ? '<div style="color:var(--text2);font-size:12px;text-align:center;padding:12px 0">✅ 暂无逾期线索</div>'
+      : overdue.map(function(l){
+          return '<div style="padding:6px 0;border-bottom:1px solid rgba(220,38,38,0.08);display:flex;justify-content:space-between;align-items:center">'
+            + '<div style="font-size:12px"><b>'+safeHTML(l.name)+'</b></div>'
+            + '<span style="font-size:11px;color:#DC2626;font-weight:600">逾期'+l.overdue_hours+'h</span></div>';
+        }).join('');
+    document.getElementById('slaOverdueList').innerHTML = overdueHtml;
+
+    // 待审核内容
+    var pr = data.pending_review || {};
+    setEle('pendingReviewCount', pr.count || 0);
+    var prTasks = pr.tasks || [];
+    var prHtml = prTasks.length === 0
+      ? '<div style="color:var(--text2);font-size:12px;text-align:center;padding:12px 0">✅ 无待审核任务</div>'
+      : prTasks.slice(0,5).map(function(t){
+          return '<div style="padding:6px 0;border-bottom:1px solid rgba(37,99,235,0.08);font-size:12px">'
+            + '<b>'+safeHTML(t.target_title||('任务 #'+t.id))+'</b>'
+            + '<span style="color:var(--text2)"> · '+safeHTML(t.platform)+'</span></div>';
+        }).join('');
+    document.getElementById('pendingReviewList').innerHTML = prHtml;
+
+    // 账号预警
+    var alerts = data.account_alerts || [];
+    setEle('alertCount', alerts.length);
+    var alertsHtml = alerts.length === 0
+      ? '<div style="color:var(--text2);font-size:12px;text-align:center;padding:12px 0">✅ 所有账号运行正常</div>'
+      : alerts.slice(0,5).map(function(a){
+          var colorMap = {banned:'#DC2626',restricted:'#D97706',quota:'#F59E0B',blacklist:'#7C3AED',warming:'#2563EB'};
+          var c = colorMap[a.alert_type] || '#6B7280';
+          return '<div style="padding:6px 0;border-bottom:1px solid rgba(148,163,184,0.08);font-size:12px">'
+            + '<b style="color:'+c+'">'+safeHTML(a.alert_label)+'</b>'
+            + '<span style="color:var(--text2)"> · '+safeHTML(a.account_name)+'</span></div>';
+        }).join('');
+    document.getElementById('alertList').innerHTML = alertsHtml;
+
+    // 今日热点
+    var topics = data.today_topics || [];
+    var topicsHtml = topics.length === 0
+      ? '<div style="color:var(--text2);font-size:12px;padding:12px 0">暂无今日热点</div>'
+      : topics.slice(0,8).map(function(t){
+          var scoreColor = t.final_score >= 80 ? '#10B981' : t.final_score >= 60 ? '#F59E0B' : '#6B7280';
+          return '<div style="min-width:180px;flex-shrink:0;padding:10px;background:rgba(148,163,184,0.06);border-radius:8px;cursor:pointer" onclick="switchTabSidebar(\'hottopics\')">'
+            + '<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px">'+safeHTML(t.title)+'</div>'
+            + '<div style="font-size:11px;color:var(--text2);margin-top:4px">🔥 '+t.final_score+' · '+safeHTML(t.platform)+'</div>'
+            + '<div style="font-size:11px;color:'+scoreColor+'">'+safeHTML(t.trend||'stable')+'</div></div>';
+        }).join('');
+    document.getElementById('todayTopicsList').innerHTML = topicsHtml;
+
+    // 紧急总数
+    var urgent = (overdue.length) + (slaDue.length);
+    setEle('todayUrgentTotal', urgent + ' 项紧急');
+    var badge = document.getElementById('dashboardUrgentBadge');
+    if (badge && urgent > 0) { badge.style.display = 'inline-flex'; badge.textContent = urgent; }
+    else if (badge) { badge.style.display = 'none'; }
+
+  } catch(e) { console.error('loadTodayActionList error:', e); }
+}
+
+// ════════════════════════════════════════
+// P0-2: 账号健康中心
+// ════════════════════════════════════════
+async function loadAccountHealth(){
+  try {
+    var data = await apiFetch(API+'/accounts/health/overview');
+    if (!data) return;
+
+    setEle('avgHealthScore', data.average_score || '--');
+
+    var gd = data.grade_distribution || {};
+    setEle('gradeA', gd.A || 0);
+    setEle('gradeBC', (gd.B||0) + (gd.C||0));
+    setEle('gradeDF', (gd.D||0) + (gd.F||0));
+
+    var al = data.alerts || {};
+    setEle('alertBanned', al.banned || 0);
+    setEle('alertRestricted', al.restricted || 0);
+    setEle('alertQuota', al.quota_near_limit || 0);
+    setEle('alertHighRisk', al.high_risk || 0);
+    setEle('alertTotal', (al.banned||0) + (al.restricted||0) + (al.quota_near_limit||0) + (al.high_risk||0));
+
+    // 账号列表
+    var accounts = data.accounts || [];
+    var tbody = document.getElementById('accountHealthTbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = accounts.length === 0
+      ? '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text2)">暂无账号数据</td></tr>'
+      : accounts.map(function(a){
+          var gradeColor = {A:'#10B981',B:'#2563EB',C:'#F59E0B',D:'#DC2626',F:'#7C3AED'}[a.grade] || '#6B7280';
+          var statusBadge = {
+            active:'badge-green',warming:'badge-blue',restricted:'badge-yellow',banned:'badge-red',resting:'badge-blue'
+          }[a.status] || 'badge-gray';
+          var warningsHtml = (a.warnings || []).map(function(w){
+            return '<div style="color:'+(w.level==='critical'?'#DC2626':w.level==='error'?'#D97706':'#2563EB')+';font-size:10px">'+safeHTML(w.message)+'</div>';
+          }).join('');
+          return '<tr>'
+            + '<td><b>'+safeHTML(a.account_name)+'</b></td>'
+            + '<td>'+safeHTML(a.platform)+'</td>'
+            + '<td><span class="badge '+statusBadge+'">'+safeHTML(a.status)+'</span></td>'
+            + '<td style="font-weight:700;color:'+gradeColor+'">'+a.total_score+'</td>'
+            + '<td style="font-weight:700;color:'+gradeColor+'">'+a.grade+'</td>'
+            + '<td style="font-size:11px">'+safeHTML(a.quota_usage?a.quota_usage.comment:'--')+'</td>'
+            + '<td style="font-size:11px;max-width:180px">'+warningsHtml+'</td>'
+            + '<td><button class="btn btn-sm btn-outline" onclick="viewAccountHealth('+a.id+')">详情</button></td>'
+            + '</tr>';
+        }).join('');
+
+    // 风险时间线
+    var tlData = await apiFetch(API+'/accounts/risk-timeline?days=7').catch(function(){ return null; });
+    var tlEl = document.getElementById('riskTimeline');
+    if (tlEl && tlData) {
+      var events = tlData.events || [];
+      tlEl.innerHTML = events.length === 0
+        ? '<div style="color:var(--text2);font-size:13px;text-align:center;padding:30px">🎉 近7天无风险事件</div>'
+        : events.slice(0,20).map(function(e){
+            var colorMap = {banned:'#DC2626',restricted:'#D97706',task_failed:'#F59E0B',rate_limited:'#F59E0B'};
+            var c = colorMap[e.type] || '#6B7280';
+            var time = e.created_at ? new Date(e.created_at).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '--';
+            return '<div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid rgba(148,163,184,0.06)">'
+              + '<div style="width:8px;height:8px;border-radius:50%;background:'+c+';margin-top:6px;flex-shrink:0"></div>'
+              + '<div style="flex:1"><div style="font-size:12px"><b>'+safeHTML(e.account_name)+'</b> <span style="color:var(--text2)">·</span> '+safeHTML(e.detail)+'</div>'
+              + '<div style="font-size:11px;color:var(--text2)">'+time+' · '+safeHTML(e.source)+'</div></div></div>';
+          }).join('');
+    }
+  } catch(e) { console.error('loadAccountHealth error:', e); }
+}
+
+async function viewAccountHealth(accountId){
+  toast('正在加载账号健康详情...', 'info');
+  try {
+    var data = await apiFetch(API+'/accounts/'+accountId+'/health');
+    if (!data) return;
+    var a = data.account || {};
+    var h = data.health || {};
+    var warnings = (h.warnings || []).map(function(w){ return '['+w.level+'] '+w.message; }).join('\n') || '暂无预警';
+    var message = '账号: '+a.account_name+' ('+a.platform+')\n健康分: '+h.total_score+' (等级 '+h.grade+')\n状态: '+a.status+'\n配额: '+a.daily_comment_usage+' 评论 / '+a.daily_publish_usage+' 发布\n\n预警:\n'+warnings;
+    alert(message);
+  } catch(e) { toast('加载失败: '+e.message, 'error'); }
+}
+
+// 扩展 loadDashboardData 加载今日必做
+async function loadDashboardDataExtended(){
+  loadDashboardData();
+  loadTodayActionList();
+}
+
+// P0-3: 更新 inbox stats 使用新 API
+async function loadInboxStats(){
+  try {
+    var data = await apiFetch(API+'/inbox/queues?status=unread&limit=1');
+    if (!data) return;
+    var stats = data.stats || {};
+    setEle('inboxUnreadTotal', stats.total || 0);
+    setEle('inboxLeadCount', stats.immediate || 0);
+    setEle('inboxNegCount', stats.manual || 0);
+    setEle('inboxAutoCount', stats.ai_auto || 0);
+    setEle('qImmediateCount', stats.immediate || 0);
+    setEle('qManualCount', stats.manual || 0);
+    setEle('qAutoCount', stats.ai_auto || 0);
+    // badge
+    var badge = document.getElementById('inboxBadge');
+    if (badge) {
+      var total = stats.total || 0;
+      if (total > 0) { badge.style.display = 'inline-flex'; badge.textContent = total > 99 ? '99+' : total; }
+      else { badge.style.display = 'none'; }
+    }
+    // dashboard badge
+    var dashBadge = document.getElementById('dashboardUrgentBadge');
+    if (dashBadge) {
+      var urgent = (stats.immediate || 0);
+      if (urgent > 0) { dashBadge.style.display = 'inline-flex'; dashBadge.textContent = urgent > 99 ? '99+' : urgent; }
+      else { dashBadge.style.display = 'none'; }
+    }
+  } catch(e) { console.error('loadInboxStats error:', e); }
+}
 
 // ════════════════════════════════════════
 // 知识库管理 (PRD 4.3)
@@ -4389,9 +5470,33 @@ async function doKbImport(){
 // 消息收件箱 (PRD 4.2)
 // ════════════════════════════════════════
 
-var inboxPage = 1, inboxData = [];
+var inboxPage = 1, inboxData = [], inboxQueueFilter = 'all';
 const SENTIMENT_MAP = {lead:'🎯 潜在客户',negative:'⚠️ 负面',positive:'👍 正面',neutral:'📝 普通'};
 const SENTIMENT_CLASS = {lead:'badge-high',negative:'badge-red',positive:'badge-green',neutral:'badge-blue'};
+
+function switchInboxQueue(queue) {
+  inboxQueueFilter = queue;
+  // Update tab buttons
+  ['All','Immediate','Manual','Auto'].forEach(function(name){
+    var tabId = 'queueTab' + name;
+    var el = document.getElementById(tabId);
+    if (!el) return;
+    var isActive = (queue === (name.toLowerCase() === 'all' ? 'all' : name.toLowerCase()));
+    if (isActive) {
+      el.style.background = 'var(--primary)';
+      el.style.color = '#fff';
+    } else {
+      var colorMap = {immediate:'#DC2626',manual:'#D97706',auto:'#2563EB'};
+      var c = colorMap[name.toLowerCase()] || 'var(--text2)';
+      el.style.background = 'rgba(148,163,184,0.06)';
+      el.style.color = c;
+    }
+  });
+  // Reload inbox
+  inboxPage = 1;
+  loadInbox();
+  loadInboxStats();
+}
 
 async function loadInbox(){
   var p = new URLSearchParams({ page: inboxPage, page_size: 20 });
@@ -4406,8 +5511,14 @@ async function loadInbox(){
   if(kw) p.set('search', kw);
   if(rd!=='') p.set('is_read', rd);
 
-  var res = await apiFetch(PAPI+'/inbox?'+p);
-  inboxData = res.data || [];
+  // P0-3: 如果选择了特定队列，使用新的 inbox API
+  if (inboxQueueFilter && inboxQueueFilter !== 'all') {
+    var queueData = await apiFetch(API+'/inbox/queues?queue='+inboxQueueFilter+'&offset='+((inboxPage-1)*20)+'&limit=20');
+    inboxData = (queueData && queueData.comments) || [];
+  } else {
+    var res = await apiFetch(PAPI+'/inbox?'+p);
+    inboxData = res.data || [];
+  }
   var tb = document.getElementById('inboxTbody');
   if(!inboxData.length){
     tb.innerHTML = '<tr><td colspan="8" class="empty">📭 暂无消息，新评论/回复会自动出现在这里</td></tr>';
@@ -5247,9 +6358,41 @@ function attrEsc(s){
 }
 function safeHTML(html){
   if(html===null||html===undefined) return '';
-  // 将 script 结束标签拆分为字符串拼接，避免 HTML 解析器误判
-  var scriptRe = new RegExp('<script[^>]*>[\\s\\S]*?</scr' + 'ipt>', 'gi');
-  return String(html).replace(scriptRe,'').replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi,'');
+  var wrapper = document.createElement('div');
+  wrapper.innerHTML = String(html);
+  // 1. 移除所有事件处理属性 (on*)
+  var allEls = wrapper.querySelectorAll('*');
+  for(var i=0; i<allEls.length; i++){
+    var el = allEls[i];
+    var attrs = el.attributes;
+    var toRemove = [];
+    for(var j=0; j<attrs.length; j++){
+      var name = attrs[j].name.toLowerCase();
+      if(name.indexOf('on')===0){ toRemove.push(attrs[j].name); }
+      // 移除 javascript: 协议
+      if((name==='href'||name==='src'||name==='action') && attrs[j].value.toLowerCase().indexOf('javascript:')===0){
+        toRemove.push(attrs[j].name);
+      }
+      // 移除 expression() 样式
+      if(name==='style' && attrs[j].value.toLowerCase().indexOf('expression')>=0){
+        toRemove.push(attrs[j].name);
+      }
+    }
+    for(var k=0; k<toRemove.length; k++){ el.removeAttribute(toRemove[k]); }
+  }
+  // 2. 移除危险标签
+  var dangerous = ['script','iframe','object','embed','base','form','input','textarea','button','link','svg','math','video','audio'];
+  for(var d=0; d<dangerous.length; d++){
+    var tags = wrapper.querySelectorAll(dangerous[d]);
+    for(var t=tags.length-1; t>=0; t--){ tags[t].remove(); }
+  }
+  // 3. 移除 <img> 标签（避免 onerror 注入）
+  var imgs = wrapper.querySelectorAll('img');
+  for(var im=imgs.length-1; im>=0; im--){ imgs[im].remove(); }
+  // 4. 移除 <meta http-equiv="refresh">
+  var metas = wrapper.querySelectorAll('meta[http-equiv]');
+  for(var m=metas.length-1; m>=0; m--){ metas[m].remove(); }
+  return wrapper.innerHTML;
 }
 function intentBadge(i){
   if(i==='high') return '<span class="badge badge-high">高意向</span>';
@@ -5258,7 +6401,7 @@ function intentBadge(i){
   return '<span style="color:#CBD5E1">-</span>';
 }
 function leadStatusBadge(s){
-  var m={new:'新线索',scored:'已评分',contacted:'已触达',responded:'已回复',qualified:'已合格',converted:'已转化',lost:'已流失'};
+  var m={new:'新线索',scored:'已评分',contacted:'已触达',responded:'已回复',qualified:'已合格',quoted:'已报价',converted:'已转化',lost:'已流失'};
   return '<span class="badge badge-low">'+(m[s]||s)+'</span>';
 }
 function showModal(id){ var el=document.getElementById(id); if(el) el.classList.add('show'); }
@@ -5284,6 +6427,15 @@ function renderPagination(containerId, totalPages, currentPage, goFn){
 
 function fmtNum(n){ return Number(n||0).toLocaleString('zh-CN'); }
 function fmtDate(s){ return s ? s.substring(0,10) : '-'; }
+function fmtTime(s){
+  if(!s) return '-';
+  // 兼容 ISO 字符串 "2026-08-05T15:37:12.530601" 或 "2026-08-05 15:37:12"
+  var t = String(s).replace('T',' ').substring(0,16);
+  // 若非今年则带年份，今年只显示 MM-DD HH:MM
+  var year = t.substring(0,4);
+  var curYear = String(new Date().getFullYear());
+  return (year === curYear) ? t.substring(5) : t;
+}
 
 let _dataCurrentView = 'dashboard';
 let _dataDateRange = {days:7, start:'', end:''};
@@ -6206,6 +7358,722 @@ async function loadOptimizationReport() {
 }
 
 // ════════════════════════════════════════
+// 💰 全链路归因 + ROI 看板 (P1-5)
+// ════════════════════════════════════════
+
+var ATTR_API = '/api/attribution';
+
+async function loadAttributionOverview() {
+  var period = document.getElementById('attrPeriod') ? document.getElementById('attrPeriod').value : 30;
+  try {
+    var data = await apiFetch(ATTR_API + '/overview?period_days=' + period);
+    if (!data) return;
+
+    // 汇总卡片
+    document.getElementById('attrTotalLeads').textContent = data.summary.total_leads || 0;
+    document.getElementById('attrConverted').textContent = data.summary.total_converted || 0;
+    document.getElementById('attrTotalValue').textContent = '¥' + fmtNum(data.summary.total_value || 0);
+    document.getElementById('attrConvRate').textContent = (data.summary.overall_conversion || 0) + '%';
+
+    // 漏斗
+    var funnelHtml = '';
+    var maxCount = 1;
+    data.funnel.funnel.forEach(function(s) { if (s.count > maxCount) maxCount = s.count; });
+    data.funnel.funnel.forEach(function(s) {
+      var width = maxCount > 0 ? (s.count / maxCount * 100) : 0;
+      var colors = ['#6366f1','#8b5cf6','#a855f7','#ec4899','#f43f5e','#f59e0b'];
+      var color = colors[data.funnel.funnel.indexOf(s) % colors.length];
+      funnelHtml += '<div style="display:flex;align-items:center;gap:12px">' +
+        '<div style="width:80px;font-size:13px;color:var(--text2);text-align:right">' + s.stage + '</div>' +
+        '<div style="flex:1;background:var(--bg);border-radius:6px;overflow:hidden;height:32px;position:relative">' +
+          '<div style="width:' + width + '%;height:100%;background:' + color + ';border-radius:6px;transition:width .5s;display:flex;align-items:center;padding-left:10px;color:#fff;font-weight:600;font-size:13px">' +
+            (width > 15 ? s.count : '') +
+          '</div>' +
+          '<span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--text2)">' + s.conv_rate + '%</span>' +
+        '</div>' +
+        '<div style="width:50px;font-size:13px;font-weight:600;text-align:right">' + s.count + '</div>' +
+      '</div>';
+    });
+    document.getElementById('attrFunnel').innerHTML = funnelHtml;
+
+    // Top performers
+    var tp = data.top_performers;
+    document.getElementById('attrTopChannel').textContent = tp.channel ? (tp.channel.channel + ' (¥' + fmtNum(tp.channel.total_value) + ')') : '暂无数据';
+    document.getElementById('attrTopContent').textContent = tp.content ? ('#' + tp.content.content_id + ' (' + tp.content.leads + ' 线索)') : '暂无数据';
+    document.getElementById('attrTopAccount').textContent = tp.account ? (tp.account.account_name + ' (' + tp.account.leads + ' 线索)') : '暂无数据';
+
+    // 加载各维度数据
+    loadAttrChannels(period);
+    loadAttrContents(period);
+    loadAttrAccounts(period);
+  } catch (e) {
+    console.error('归因看板加载失败', e);
+  }
+}
+
+async function loadAttrChannels(period) {
+  try {
+    var data = await apiFetch(ATTR_API + '/by-channel?period_days=' + period);
+    var html = '';
+    if (!data || !data.channels || data.channels.length === 0) {
+      html = '<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--text2)">暂无渠道数据</td></tr>';
+    } else {
+      data.channels.forEach(function(c) {
+        html += '<tr style="border-bottom:1px solid var(--border)">' +
+          '<td style="padding:10px 12px;font-weight:600">' + esc(c.channel || 'unknown') + '</td>' +
+          '<td style="padding:10px 12px;text-align:right">' + c.leads + '</td>' +
+          '<td style="padding:10px 12px;text-align:right">' + c.qualified + '</td>' +
+          '<td style="padding:10px 12px;text-align:right;color:#10b981;font-weight:600">' + c.converted + '</td>' +
+          '<td style="padding:10px 12px;text-align:right">' + c.friend_added + '</td>' +
+          '<td style="padding:10px 12px;text-align:right">¥' + c.cpl + '</td>' +
+          '<td style="padding:10px 12px;text-align:right">¥' + c.cpa + '</td>' +
+          '<td style="padding:10px 12px;text-align:right;color:' + (c.roi >= 0 ? '#10b981' : '#ef4444') + '">' + c.roi + '%</td>' +
+          '<td style="padding:10px 12px;text-align:right">' + c.avg_score + '</td>' +
+          '<td style="padding:10px 12px;text-align:right">' + c.conversion_rate + '%</td>' +
+        '</tr>';
+      });
+    }
+    document.getElementById('attrChannelBody').innerHTML = html;
+  } catch (e) { console.error('渠道ROI加载失败', e); }
+}
+
+async function loadAttrContents(period) {
+  try {
+    var data = await apiFetch(ATTR_API + '/by-content?period_days=' + period);
+    var html = '';
+    if (!data || !data.contents || data.contents.length === 0) {
+      html = '<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--text2)">暂无内容归因数据（需评论转线索后自动建立）</td></tr>';
+    } else {
+      data.contents.forEach(function(c) {
+        html += '<tr style="border-bottom:1px solid var(--border)">' +
+          '<td style="padding:10px 12px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(c.content_preview || '') + '</td>' +
+          '<td style="padding:10px 12px">' + esc(c.platform || '') + '</td>' +
+          '<td style="padding:10px 12px;text-align:right">' + fmtNum(c.views) + '</td>' +
+          '<td style="padding:10px 12px;text-align:right">' + (c.engagement_rate || 0) + '%</td>' +
+          '<td style="padding:10px 12px;text-align:right">' + c.leads + '</td>' +
+          '<td style="padding:10px 12px;text-align:right;color:#10b981;font-weight:600">' + c.converted + '</td>' +
+          '<td style="padding:10px 12px;text-align:right">' + c.conversion_rate + '%</td>' +
+        '</tr>';
+      });
+    }
+    document.getElementById('attrContentBody').innerHTML = html;
+  } catch (e) { console.error('内容ROI加载失败', e); }
+}
+
+async function loadAttrAccounts(period) {
+  try {
+    var data = await apiFetch(ATTR_API + '/by-account?period_days=' + period);
+    var html = '';
+    if (!data || !data.accounts || data.accounts.length === 0) {
+      html = '<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--text2)">暂无账号归因数据</td></tr>';
+    } else {
+      data.accounts.forEach(function(a) {
+        html += '<tr style="border-bottom:1px solid var(--border)">' +
+          '<td style="padding:10px 12px;font-weight:600">' + esc(a.account_name || '') + '</td>' +
+          '<td style="padding:10px 12px">' + esc(a.platform || '') + '</td>' +
+          '<td style="padding:10px 12px;text-align:right">' + fmtNum(a.follower_count) + '</td>' +
+          '<td style="padding:10px 12px;text-align:right">' + a.leads + '</td>' +
+          '<td style="padding:10px 12px;text-align:right;color:#10b981;font-weight:600">' + a.converted + '</td>' +
+          '<td style="padding:10px 12px;text-align:right">' + a.friend_added + '</td>' +
+          '<td style="padding:10px 12px;text-align:right;color:' + (a.roi >= 0 ? '#10b981' : '#ef4444') + '">' + a.roi + '%</td>' +
+          '<td style="padding:10px 12px;text-align:right">' + a.conversion_rate + '%</td>' +
+        '</tr>';
+      });
+    }
+    document.getElementById('attrAccountBody').innerHTML = html;
+  } catch (e) { console.error('账号ROI加载失败', e); }
+}
+
+function switchAttrView(view, el) {
+  document.querySelectorAll('.data-subnav .data-nav-item').forEach(function(n) {
+    n.style.background = ''; n.style.color = 'var(--text2)';
+  });
+  if (el) { el.style.background = 'var(--bg)'; el.style.color = 'var(--primary)'; }
+  document.getElementById('attrChannelView').style.display = view === 'channel' ? 'block' : 'none';
+  document.getElementById('attrContentView').style.display = view === 'content' ? 'block' : 'none';
+  document.getElementById('attrAccountView').style.display = view === 'account' ? 'block' : 'none';
+}
+
+// ════════════════════════════════════════
+// 🏢 企微私域承接工作台 (P1-6)
+// ════════════════════════════════════════
+
+var WECOM_API = '/api/wecom';
+
+async function loadWecomDashboard() {
+  await Promise.all([
+    loadWecomStats(),
+    loadWecomLiveCodes(),
+    loadWecomContacts(),
+    loadWecomWelcomeMsgs(),
+    loadWecomMassMsgs()
+  ]);
+}
+
+async function loadWecomStats() {
+  try {
+    var d = await apiFetch(WECOM_API + '/statistics');
+    if (!d) return;
+    document.getElementById('wecomTotalContacts').textContent = d.contacts.total;
+    document.getElementById('wecomTodayNew').textContent = '今日新增 ' + d.contacts.today_new;
+    document.getElementById('wecomCodeRate').textContent = d.live_codes.conversion_rate + '%';
+    document.getElementById('wecomCodeStats').textContent = '扫码 ' + d.live_codes.total_scans + ' / 添加 ' + d.live_codes.total_adds;
+    document.getElementById('wecomMassTotal').textContent = d.mass_messages.total;
+    document.getElementById('wecomMassSent').textContent = '已发送 ' + d.mass_messages.sent;
+    document.getElementById('wecomConvRate').textContent = d.funnel.conversion_rate + '%';
+    document.getElementById('wecomFunnel').textContent = '加好友 ' + d.funnel.friend_added + ' → 成交 ' + d.funnel.converted;
+  } catch (e) { console.error('wecom stats', e); }
+}
+
+async function loadWecomLiveCodes() {
+  try {
+    var d = await apiFetch(WECOM_API + '/live-codes');
+    var html = '';
+    if (!d || !d.data || d.data.length === 0) {
+      html = '<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--text2)">暂无活码，点击右上角创建</td></tr>';
+    } else {
+      d.data.forEach(function(c) {
+        html += '<tr style="border-bottom:1px solid var(--border)">' +
+          '<td style="padding:10px 12px;font-weight:600">' + esc(c.name) + '</td>' +
+          '<td style="padding:10px 12px"><span style="background:var(--bg);padding:2px 8px;border-radius:4px;font-size:11px">' + esc(c.source_platform || '通用') + '</span></td>' +
+          '<td style="padding:10px 12px"><a href="' + esc(c.code_url) + '" target="_blank" style="color:var(--primary);font-size:12px">查看二维码</a></td>' +
+          '<td style="padding:10px 12px;text-align:right">' + c.scan_count + '</td>' +
+          '<td style="padding:10px 12px;text-align:right;color:#10b981;font-weight:600">' + c.add_count + '</td>' +
+          '<td style="padding:10px 12px;text-align:right">' + c.conversion_rate + '%</td>' +
+          '<td style="padding:10px 12px;text-align:center"><button onclick="simulateWecomScan(' + c.id + ')" style="background:var(--bg);border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;color:var(--primary)">模拟扫码</button></td>' +
+        '</tr>';
+      });
+    }
+    document.getElementById('wecomLiveCodeBody').innerHTML = html;
+  } catch (e) { console.error('wecom livecodes', e); }
+}
+
+async function loadWecomContacts() {
+  try {
+    var d = await apiFetch(WECOM_API + '/contacts?page=1&page_size=50');
+    var html = '';
+    if (!d || !d.data || d.data.length === 0) {
+      html = '<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--text2)">暂无客户（加好友后自动录入）</td></tr>';
+    } else {
+      d.data.forEach(function(c) {
+        var tagsHtml = '';
+        try { JSON.parse(c.tags || '[]').forEach(function(t) { tagsHtml += '<span style="background:rgba(99,102,241,0.1);color:#6366f1;padding:2px 8px;border-radius:4px;font-size:11px;margin-right:4px">' + esc(t) + '</span>'; }); } catch(e){}
+        html += '<tr style="border-bottom:1px solid var(--border)">' +
+          '<td style="padding:10px 12px;font-weight:600">' + esc(c.name) + '</td>' +
+          '<td style="padding:10px 12px">' + esc(c.corp_name || '-') + '</td>' +
+          '<td style="padding:10px 12px">' + tagsHtml + '</td>' +
+          '<td style="padding:10px 12px"><span style="background:var(--bg);padding:2px 8px;border-radius:4px;font-size:11px">' + esc(c.source_platform || '直接') + '</span></td>' +
+          '<td style="padding:10px 12px;font-size:12px">' + (c.friend_added_at ? c.friend_added_at.substring(0,16) : '-') + '</td>' +
+          '<td style="padding:10px 12px;text-align:center">' + (c.source_lead_id ? '<a href="#" onclick="loadLeadDetail(' + c.source_lead_id + ');return false" style="color:var(--primary)">#' + c.source_lead_id + '</a>' : '-') + '</td>' +
+        '</tr>';
+      });
+    }
+    document.getElementById('wecomContactsBody').innerHTML = html;
+  } catch (e) { console.error('wecom contacts', e); }
+}
+
+async function loadWecomWelcomeMsgs() {
+  try {
+    var d = await apiFetch(WECOM_API + '/welcome-messages');
+    var html = '';
+    if (!d || !d.data || d.data.length === 0) {
+      html = '<div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--text2);background:rgba(255,255,255,0.95);border-radius:var(--radius)">暂无欢迎语配置</div>';
+    } else {
+      d.data.forEach(function(m) {
+        var statusColor = m.is_active ? '#10b981' : '#94a3b8';
+        var triggerHtml = '';
+        if (m.trigger_source) triggerHtml += '<span style="background:rgba(245,158,11,0.1);color:#d97706;padding:2px 6px;border-radius:3px;font-size:10px">来源:' + esc(m.trigger_source) + '</span> ';
+        try { var ts = JSON.parse(m.trigger_tags || '[]'); if (ts.length) triggerHtml += '<span style="background:rgba(236,72,153,0.1);color:#be185d;padding:2px 6px;border-radius:3px;font-size:10px">标签:' + ts.join(',') + '</span>'; } catch(e){}
+        html += '<div style="background:rgba(255,255,255,0.95);border-radius:var(--radius);padding:16px;border:1px solid rgba(148,163,184,0.12)">' +
+          '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px">' +
+            '<div style="font-weight:600;font-size:14px">' + esc(m.name) + '</div>' +
+            '<span style="background:' + statusColor + '20;color:' + statusColor + ';padding:2px 8px;border-radius:4px;font-size:10px">' + (m.is_active ? '启用' : '停用') + '</span>' +
+          '</div>' +
+          '<div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:8px;max-height:80px;overflow:hidden">' + esc(m.content.substring(0,120)) + (m.content.length > 120 ? '...' : '') + '</div>' +
+          '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
+            '<span style="background:var(--bg);padding:2px 6px;border-radius:3px;font-size:10px">类型:' + m.media_type + '</span>' +
+            '<span style="background:var(--bg);padding:2px 6px;border-radius:3px;font-size:10px">优先级:' + m.priority + '</span>' +
+            '<span style="background:var(--bg);padding:2px 6px;border-radius:3px;font-size:10px">使用:' + m.use_count + '次</span>' +
+            triggerHtml +
+          '</div>' +
+        '</div>';
+      });
+    }
+    document.getElementById('wecomWelcomeGrid').innerHTML = html;
+  } catch (e) { console.error('wecom welcome', e); }
+}
+
+async function loadWecomMassMsgs() {
+  try {
+    var d = await apiFetch(WECOM_API + '/mass-messages');
+    var html = '';
+    if (!d || !d.data || d.data.length === 0) {
+      html = '<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--text2)">暂无群发任务</td></tr>';
+    } else {
+      var statusColors = {draft:'#94a3b8', scheduled:'#f59e0b', sending:'#3b82f6', sent:'#10b981', failed:'#ef4444'};
+      var statusLabels = {draft:'草稿', scheduled:'定时', sending:'发送中', sent:'已发送', failed:'失败'};
+      d.data.forEach(function(m) {
+        var color = statusColors[m.status] || '#94a3b8';
+        var label = statusLabels[m.status] || m.status;
+        var actionBtn = m.status === 'draft' || m.status === 'scheduled'
+          ? '<button onclick="sendWecomMass(' + m.id + ')" style="background:var(--primary);color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px">发送</button>'
+          : '-';
+        html += '<tr style="border-bottom:1px solid var(--border)">' +
+          '<td style="padding:10px 12px;font-weight:600">' + esc(m.title) + '</td>' +
+          '<td style="padding:10px 12px;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">' + esc(m.content) + '</td>' +
+          '<td style="padding:10px 12px;text-align:right">' + m.target_count + '</td>' +
+          '<td style="padding:10px 12px;text-align:right">' + m.sent_count + '</td>' +
+          '<td style="padding:10px 12px;text-align:center"><span style="background:' + color + '20;color:' + color + ';padding:2px 8px;border-radius:4px;font-size:11px">' + label + '</span></td>' +
+          '<td style="padding:10px 12px;text-align:center">' + actionBtn + '</td>' +
+        '</tr>';
+      });
+    }
+    document.getElementById('wecomMassBody').innerHTML = html;
+  } catch (e) { console.error('wecom mass', e); }
+}
+
+function switchWecomView(view, el) {
+  document.querySelectorAll('#tab-wecom .data-subnav .data-nav-item').forEach(function(n) {
+    n.style.background = ''; n.style.color = 'var(--text2)';
+  });
+  if (el) { el.style.background = 'var(--bg)'; el.style.color = 'var(--primary)'; }
+  document.getElementById('wecomLiveCodeView').style.display = view === 'livecode' ? 'block' : 'none';
+  document.getElementById('wecomContactsView').style.display = view === 'contacts' ? 'block' : 'none';
+  document.getElementById('wecomWelcomeView').style.display = view === 'welcome' ? 'block' : 'none';
+  document.getElementById('wecomMassView').style.display = view === 'mass' ? 'block' : 'none';
+}
+
+async function simulateWecomScan(codeId) {
+  try {
+    await apiFetch(WECOM_API + '/live-codes/' + codeId + '/scan', {method: 'POST'});
+    loadWecomLiveCodes(); loadWecomStats();
+    alert('扫码已记录');
+  } catch (e) { alert('扫码失败'); }
+}
+
+async function sendWecomMass(msgId) {
+  if (!confirm('确认发送此群发消息？')) return;
+  try {
+    var r = await apiFetch(WECOM_API + '/mass-messages/' + msgId + '/send', {method: 'POST'});
+    alert(r.message || '发送完成');
+    loadWecomMassMsgs(); loadWecomStats();
+  } catch (e) { alert('发送失败: ' + e.message); }
+}
+
+function showAddLiveCodeModal() {
+  var name = prompt('活码名称：');
+  if (!name) return;
+  var platform = prompt('来源平台（留空=通用，可选: weibo/douyin/xiaohongshu/zhihu/bilibili/wechat_article）：', 'douyin');
+  createWecomLiveCode(name, platform);
+}
+
+async function createWecomLiveCode(name, platform) {
+  try {
+    var r = await apiFetch(WECOM_API + '/live-codes', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: name, wecom_account_id: 1, source_platform: platform || '', auto_tags: [platform ? platform + '来源' : '通用', '高意向']})
+    });
+    alert('活码创建成功');
+    loadWecomLiveCodes(); loadWecomStats();
+  } catch (e) { alert('创建失败: ' + e.message); }
+}
+
+function showAddMassModal() {
+  var title = prompt('群发任务名称：');
+  if (!title) return;
+  var content = prompt('群发内容：');
+  if (!content) return;
+  createWecomMass(title, content);
+}
+
+async function createWecomMass(title, content) {
+  try {
+    var r = await apiFetch(WECOM_API + '/mass-messages', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({title: title, content: content, wecom_account_id: 1, target_tags: ['高意向'], media_type: 'text'})
+    });
+    alert('群发任务已创建，目标 ' + (r.data ? r.data.target_count : 0) + ' 人');
+    loadWecomMassMsgs(); loadWecomStats();
+  } catch (e) { alert('创建失败: ' + e.message); }
+}
+
+function showWecomSettings() {
+  alert('企微配置请通过 API 设置：\nPOST /api/wecom/account\n\n参数：corp_id, agent_id, secret, callback_token, callback_encoding_aes');
+}
+
+// ════════════════════════════════════════
+// 🗂️ 素材资产库 P1-7
+// ════════════════════════════════════════
+var CA_API = '/api/content-asset';
+var CA_PLATFORMS = ['weibo','douyin','xiaohongshu','zhihu','bilibili','wechat_article','wechat_video','toutiao','kuaishou'];
+
+async function loadContentAssetDashboard() {
+  loadContentAssetStats();
+  loadMyTemplates();
+  // 填充筛选下拉
+  fillCaFilterOptions();
+}
+
+function fillCaFilterOptions() {
+  var p1 = document.getElementById('caFilterPlatform');
+  var p2 = document.getElementById('caMarketPlatform');
+  if (p1 && p1.options.length <= 1) {
+    CA_PLATFORMS.forEach(function(p){
+      var o1 = document.createElement('option'); o1.value = p; o1.textContent = p; p1.appendChild(o1);
+      var o2 = document.createElement('option'); o2.value = p; o2.textContent = p; p2.appendChild(o2.cloneNode(true));
+    });
+  }
+  // 行业下拉
+  apiFetch(CA_API + '/market/industries').then(function(r){
+    var inds = r.data || [];
+    ['caFilterIndustry','caMarketIndustry'].forEach(function(id){
+      var sel = document.getElementById(id);
+      if (!sel || sel.options.length > 1) return;
+      inds.forEach(function(ind){
+        var o = document.createElement('option'); o.value = ind; o.textContent = ind; sel.appendChild(o);
+      });
+    });
+  }).catch(function(){});
+}
+
+async function loadContentAssetStats() {
+  try {
+    var r = await apiFetch(CA_API + '/dashboard');
+    var d = r.data || {};
+    document.getElementById('caTotalTemplates').textContent = d.total_templates || 0;
+    document.getElementById('caTotalVariants').textContent = '变体 ' + (d.total_variants || 0);
+    document.getElementById('caAbSent').textContent = d.ab_sent_total || 0;
+    document.getElementById('caAbReply').textContent = '回复 ' + (d.ab_reply_total || 0) + ' · 回复率 ' + (d.overall_reply_rate || 0) + '%';
+    document.getElementById('caAbLead').textContent = d.ab_lead_total || 0;
+    document.getElementById('caAbConv').textContent = '成交 ' + (d.ab_converted_total || 0) + ' · 转化率 ' + (d.overall_convert_rate || 0) + '%';
+    document.getElementById('caMarketCount').textContent = d.market_count || 0;
+  } catch (e) { console.error('stats', e); }
+}
+
+function switchContentView(view, el) {
+  document.querySelectorAll('#tab-content-asset .data-subnav .data-nav-item').forEach(function(n) {
+    n.style.background = ''; n.style.color = 'var(--text2)';
+  });
+  if (el) { el.style.background = 'var(--bg)'; el.style.color = 'var(--primary)'; }
+  document.getElementById('caMineView').style.display = view === 'mine' ? 'block' : 'none';
+  document.getElementById('caAbtestView').style.display = view === 'abtest' ? 'block' : 'none';
+  document.getElementById('caMarketView').style.display = view === 'market' ? 'block' : 'none';
+  document.getElementById('caRankView').style.display = view === 'rank' ? 'block' : 'none';
+  if (view === 'abtest') loadAbTestSelect();
+  else if (view === 'market') loadMarketTemplates();
+  else if (view === 'rank') loadLeaderboard();
+}
+
+async function loadMyTemplates() {
+  var platform = document.getElementById('caFilterPlatform').value;
+  var industry = document.getElementById('caFilterIndustry').value;
+  var search = document.getElementById('caSearch').value.trim();
+  var qs = '?status=active&exclude_variants=true';
+  if (platform) qs += '&platform=' + encodeURIComponent(platform);
+  if (industry) qs += '&industry=' + encodeURIComponent(industry);
+  if (search) qs += '&search=' + encodeURIComponent(search);
+  try {
+    var r = await apiFetch(CA_API + '/templates' + qs);
+    var rows = r.data || [];
+    var tbody = document.getElementById('caTemplateBody');
+    tbody.innerHTML = rows.map(function(t){
+      return '<tr>'
+        + '<td><span class="tag-badge" style="background:var(--bg);color:var(--primary)">'+esc(t.platform)+'</span></td>'
+        + '<td>'+esc(t.category||'-')+'</td>'
+        + '<td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+attrEsc(t.template)+'">'+esc((t.template||'').slice(0,60))+'...</td>'
+        + '<td>'+esc(t.industry||'通用')+'</td>'
+        + '<td><span style="color:var(--primary);font-weight:600">v'+t.version+'</span></td>'
+        + '<td style="text-align:center">'+(t.ab_test_count||0)+'</td>'
+        + '<td style="text-align:center"><span style="color:'+(t.reply_rate>=15?'#10b981':t.reply_rate>0?'#f59e0b':'var(--text2)')+';font-weight:600">'+t.reply_rate+'%</span></td>'
+        + '<td style="text-align:center">'+t.convert_rate+'%</td>'
+        + '<td style="white-space:nowrap">'
+        + '<button class="btn-link" onclick="showVersionsModal('+t.id+')">📜版本</button> '
+        + '<button class="btn-link" onclick="showCreateVariantModal('+t.id+')">🧪变体</button> '
+        + '<button class="btn-link" onclick="showApplyModal('+t.id+')">📤套用</button> '
+        + '<button class="btn-link" onclick="publishToMarket('+t.id+')">🏪发布</button> '
+        + '<button class="btn-link" style="color:#ef4444" onclick="archiveTemplate('+t.id+')">归档</button>'
+        + '</td></tr>';
+    }).join('') || '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text2)">暂无模板，点击右上角「+ 新建模板」</td></tr>';
+  } catch (e) { console.error('loadMyTemplates', e); }
+}
+
+async function loadAbTestSelect() {
+  try {
+    var r = await apiFetch(CA_API + '/templates?status=active&exclude_variants=true');
+    var sel = document.getElementById('caAbTestSelect');
+    var cur = sel.value;
+    sel.innerHTML = '<option value="">请选择...</option>';
+    (r.data || []).forEach(function(t){
+      var o = document.createElement('option'); o.value = t.id;
+      o.textContent = '[' + t.platform + '] ' + (t.template||'').slice(0,30) + '...';
+      sel.appendChild(o);
+    });
+    if (cur) sel.value = cur;
+  } catch (e) { console.error('loadAbTestSelect', e); }
+}
+
+async function loadAbStats() {
+  var tid = document.getElementById('caAbTestSelect').value;
+  var box = document.getElementById('caAbStatsResult');
+  if (!tid) { box.innerHTML = ''; return; }
+  try {
+    var r = await apiFetch(CA_API + '/templates/' + tid + '/ab-stats');
+    var d = r.data || {};
+    var variants = d.variants || [];
+    var winner = d.winner;
+    var summary = d.summary || {};
+    var html = '';
+    // 胜出提示
+    if (winner) {
+      html += '<div style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;padding:14px 18px;border-radius:var(--radius);margin-bottom:14px">'
+        + '<div style="font-size:13px;opacity:0.9">🏆 胜出版本</div>'
+        + '<div style="font-size:18px;font-weight:700;margin-top:4px">'+esc(winner.label)+' — 回复率 '+winner.reply_rate+'% · 转化率 '+winner.convert_rate+'%</div>'
+        + '</div>';
+    }
+    // 汇总
+    html += '<div style="display:flex;gap:14px;margin-bottom:14px;flex-wrap:wrap">'
+      + '<div class="stat-card" style="flex:1;min-width:120px;padding:12px;border-radius:var(--radius);background:var(--bg)">'
+      + '<div style="font-size:11px;color:var(--text2)">总发送</div><div style="font-size:20px;font-weight:700">'+summary.total_sent+'</div></div>'
+      + '<div class="stat-card" style="flex:1;min-width:120px;padding:12px;border-radius:var(--radius);background:var(--bg)">'
+      + '<div style="font-size:11px;color:var(--text2)">总回复</div><div style="font-size:20px;font-weight:700">'+summary.total_reply+'</div></div>'
+      + '<div class="stat-card" style="flex:1;min-width:120px;padding:12px;border-radius:var(--radius);background:var(--bg)">'
+      + '<div style="font-size:11px;color:var(--text2)">总线索</div><div style="font-size:20px;font-weight:700">'+summary.total_lead+'</div></div>'
+      + '<div class="stat-card" style="flex:1;min-width:120px;padding:12px;border-radius:var(--radius);background:var(--bg)">'
+      + '<div style="font-size:11px;color:var(--text2)">总成交</div><div style="font-size:20px;font-weight:700">'+summary.total_conv+'</div></div>'
+      + '</div>';
+    // 对比表
+    html += '<div style="overflow-x:auto"><table class="data-table"><thead><tr>'
+      + '<th>版本</th><th>内容预览</th><th>发送</th><th>回复</th><th>回复率</th><th>线索</th><th>成交</th><th>转化率</th>'
+      + '</tr></thead><tbody>';
+    variants.forEach(function(v){
+      var isWin = winner && winner.id === v.id;
+      html += '<tr style="'+(isWin?'background:rgba(16,185,129,0.08)':'')+'">'
+        + '<td>'+(isWin?'🏆 ':'')+esc(v.label)+(v.is_base?'<span style="font-size:11px;color:var(--text2)"> (原版)</span>':'')+'</td>'
+        + '<td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(v.content_preview)+'</td>'
+        + '<td style="text-align:center">'+v.sent_count+'</td>'
+        + '<td style="text-align:center">'+v.reply_count+'</td>'
+        + '<td style="text-align:center;font-weight:600;color:'+(v.reply_rate>=15?'#10b981':v.reply_rate>0?'#f59e0b':'var(--text2)')+'">'+v.reply_rate+'%</td>'
+        + '<td style="text-align:center">'+v.lead_count+'</td>'
+        + '<td style="text-align:center">'+v.converted_count+'</td>'
+        + '<td style="text-align:center">'+v.convert_rate+'%</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div>';
+    // 操作按钮
+    html += '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'
+      + '<button class="btn btn-outline btn-sm" onclick="recordAbOutcome('+tid+',\'sent\')">📤 记录发送</button>'
+      + '<button class="btn btn-outline btn-sm" onclick="recordAbOutcome('+tid+',\'replied\')">💬 记录回复</button>'
+      + '<button class="btn btn-outline btn-sm" onclick="recordAbOutcome('+tid+',\'lead\')">🎯 记录线索</button>'
+      + '<button class="btn btn-outline btn-sm" onclick="recordAbOutcome('+tid+',\'converted\')">💰 记录成交</button>'
+      + '<button class="btn btn-primary btn-sm" onclick="showCreateVariantModal('+tid+')">+ 新建变体</button>'
+      + '</div>';
+    box.innerHTML = html;
+  } catch (e) { box.innerHTML = '<div style="color:#ef4444">加载失败: '+esc(e.message)+'</div>'; }
+}
+
+async function recordAbOutcome(templateId, type) {
+  var body = { template_id: templateId };
+  if (type === 'sent') {}  // 纯发送
+  else if (type === 'replied') body.replied = true;
+  else if (type === 'lead') body.lead_generated = true;
+  else if (type === 'converted') body.converted = true;
+  try {
+    var r = await apiFetch(CA_API + '/ab-outcome', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    alert(r.message || '已记录');
+    loadAbStats(); loadContentAssetStats();
+  } catch (e) { alert('记录失败: ' + e.message); }
+}
+
+async function loadMarketTemplates() {
+  var industry = document.getElementById('caMarketIndustry').value;
+  var platform = document.getElementById('caMarketPlatform').value;
+  var search = document.getElementById('caMarketSearch').value.trim();
+  var qs = '';
+  var params = [];
+  if (industry) params.push('industry=' + encodeURIComponent(industry));
+  if (platform) params.push('platform=' + encodeURIComponent(platform));
+  if (search) params.push('search=' + encodeURIComponent(search));
+  if (params.length) qs = '?' + params.join('&');
+  try {
+    var r = await apiFetch(CA_API + '/market' + qs);
+    var rows = r.data || [];
+    var grid = document.getElementById('caMarketGrid');
+    grid.innerHTML = rows.map(function(t){
+      return '<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:8px">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center">'
+        + '<span class="tag-badge" style="background:rgba(99,102,241,0.1);color:#6366f1">'+esc(t.industry||'通用')+'</span>'
+        + '<span style="font-size:11px;color:var(--text2)">'+esc(t.platform)+'</span>'
+        + '</div>'
+        + '<div style="font-size:13px;line-height:1.5;color:var(--text);max-height:80px;overflow:hidden">'+esc((t.template||'').slice(0,120))+'...</div>'
+        + '<div style="font-size:11px;color:var(--text2)">分类: '+esc(t.market_category||t.category||'-')+' · Fork '+(t.fork_count||0)+'</div>'
+        + '<button class="btn btn-primary btn-sm" onclick="forkFromMarket('+t.id+')" style="margin-top:auto">🍴 Fork 到我的素材库</button>'
+        + '</div>';
+    }).join('') || '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text2)">市场暂无模板，点击右上角「初始化市场模板」预置行业模板</div>';
+  } catch (e) { console.error('loadMarket', e); }
+}
+
+async function loadLeaderboard() {
+  var metric = document.getElementById('caRankMetric').value;
+  try {
+    var r = await apiFetch(CA_API + '/leaderboard?metric=' + metric);
+    var rows = r.data || [];
+    var tbody = document.getElementById('caRankBody');
+    tbody.innerHTML = rows.map(function(t, i){
+      var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i+1);
+      return '<tr>'
+        + '<td style="text-align:center;font-weight:700">'+medal+'</td>'
+        + '<td>'+esc(t.platform)+'</td>'
+        + '<td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(t.content_preview)+'</td>'
+        + '<td>'+esc(t.variant_label||'原版')+'</td>'
+        + '<td style="text-align:center">'+t.sent_count+'</td>'
+        + '<td style="text-align:center">'+t.reply_count+'</td>'
+        + '<td style="text-align:center;font-weight:600;color:'+(t.reply_rate>=15?'#10b981':t.reply_rate>0?'#f59e0b':'var(--text2)')+'">'+t.reply_rate+'%</td>'
+        + '<td style="text-align:center">'+t.lead_count+'</td>'
+        + '<td style="text-align:center">'+t.converted_count+'</td>'
+        + '<td style="text-align:center">'+t.convert_rate+'%</td>'
+        + '</tr>';
+    }).join('') || '<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text2)">暂无 A/B 数据，先在「我的素材」创建模板并记录效果</td></tr>';
+  } catch (e) { console.error('loadLeaderboard', e); }
+}
+
+function showCreateTemplateModal() {
+  var platform = prompt('平台（weibo/douyin/xiaohongshu/zhihu/bilibili/wechat_article 等）：', 'douyin');
+  if (!platform) return;
+  var template = prompt('模板内容：');
+  if (!template) return;
+  var category = prompt('分类（如：评论引流/私信话术）：', '评论引流') || '';
+  var industry = prompt('行业（通用/电商/企服/教育/本地生活/SaaS 等）：', '通用') || '通用';
+  createTemplateApi(platform, template, category, industry);
+}
+
+async function createTemplateApi(platform, template, category, industry) {
+  try {
+    var r = await apiFetch(CA_API + '/templates', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({platform: platform, template: template, category: category, industry: industry})
+    });
+    alert('模板创建成功（v1）');
+    loadMyTemplates(); loadContentAssetStats();
+  } catch (e) { alert('创建失败: ' + e.message); }
+}
+
+async function showVersionsModal(tid) {
+  try {
+    var r = await apiFetch(CA_API + '/templates/' + tid + '/versions');
+    var versions = r.data || [];
+    var cur = r.current_version;
+    var html = '当前版本: v' + cur + '\n\n版本历史:\n';
+    versions.forEach(function(v){
+      html += 'v' + v.version_number + ' · ' + (v.change_note||'无说明') + ' · ' + (v.changed_by_name||'') + ' · ' + (v.created_at||'') + '\n';
+      html += '  内容: ' + (v.content_snapshot||'').slice(0,60) + '...\n';
+    });
+    var vid = prompt(html + '\n\n输入要回滚的版本记录 ID（查看上方列表，留空取消）：', '');
+    if (vid) rollbackTemplate(tid, parseInt(vid));
+  } catch (e) { alert('加载版本失败: ' + e.message); }
+}
+
+async function rollbackTemplate(tid, vid) {
+  if (!confirm('确认回滚到该版本？当前版本会自动存档。')) return;
+  try {
+    var r = await apiFetch(CA_API + '/templates/' + tid + '/versions/' + vid + '/rollback', {method: 'POST'});
+    alert(r.message || '已回滚');
+    loadMyTemplates();
+  } catch (e) { alert('回滚失败: ' + e.message); }
+}
+
+function showCreateVariantModal(baseId) {
+  var label = prompt('变体标签（A/B/C/D）：', 'B');
+  if (!label) return;
+  var template = prompt('变体内容：');
+  if (!template) return;
+  createVariantApi(baseId, label, template);
+}
+
+async function createVariantApi(baseId, label, template) {
+  try {
+    var r = await apiFetch(CA_API + '/templates/' + baseId + '/variants', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({variant_label: label, template: template})
+    });
+    alert('变体 ' + label + ' 创建成功');
+    loadMyTemplates();
+  } catch (e) { alert('创建失败: ' + e.message); }
+}
+
+async function showApplyModal(tid) {
+  try {
+    var r = await apiFetch(CA_API + '/apply/accounts');
+    var accs = r.data || [];
+    if (!accs.length) { alert('暂无可用账号'); return; }
+    var list = accs.map(function(a){ return '[' + a.id + '] ' + a.platform + ' / ' + a.account_name + ' (' + a.status + ')'; }).join('\n');
+    var input = prompt('选择账号 ID（多个用逗号分隔）:\n' + list, '');
+    if (!input) return;
+    var ids = input.split(',').map(function(s){return parseInt(s.trim());}).filter(function(n){return !isNaN(n);});
+    if (!ids.length) { alert('未选择有效账号'); return; }
+    var taskType = prompt('任务类型（comment/publish/dm）：', 'comment') || 'comment';
+    applyToAccountsApi(tid, ids, taskType);
+  } catch (e) { alert('加载账号失败: ' + e.message); }
+}
+
+async function applyToAccountsApi(tid, accountIds, taskType) {
+  try {
+    var r = await apiFetch(CA_API + '/templates/' + tid + '/apply', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({account_ids: accountIds, task_type: taskType})
+    });
+    alert(r.message || '套用完成');
+    loadContentAssetStats();
+  } catch (e) { alert('套用失败: ' + e.message); }
+}
+
+async function publishToMarket(tid) {
+  var industry = prompt('行业分类（通用/电商/企服/教育/本地生活/SaaS 等）：', '通用');
+  if (!industry) return;
+  var category = prompt('市场分类（可选）：', '') || '';
+  try {
+    var r = await apiFetch(CA_API + '/templates/' + tid + '/publish', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({industry: industry, market_category: category})
+    });
+    alert(r.message || '已发布到市场');
+    loadContentAssetStats();
+  } catch (e) { alert('发布失败: ' + e.message); }
+}
+
+async function forkFromMarket(tid) {
+  if (!confirm('确认 fork 该市场模板到我的素材库？')) return;
+  try {
+    var r = await apiFetch(CA_API + '/market/' + tid + '/fork', {method: 'POST'});
+    alert(r.message || '已 fork');
+    loadContentAssetStats();
+  } catch (e) { alert('fork 失败: ' + e.message); }
+}
+
+async function seedMarketTemplates() {
+  if (!confirm('确认初始化预置行业模板？仅首次执行有效。')) return;
+  try {
+    var r = await apiFetch(CA_API + '/market/seed', {method: 'POST'});
+    alert(r.message || '初始化完成');
+    loadContentAssetStats();
+    if (document.getElementById('caMarketView').style.display !== 'none') loadMarketTemplates();
+  } catch (e) { alert('初始化失败: ' + e.message); }
+}
+
+async function archiveTemplate(tid) {
+  if (!confirm('确认归档该模板？归档后可在版本历史中恢复。')) return;
+  try {
+    var r = await apiFetch(CA_API + '/templates/' + tid, {method: 'DELETE'});
+    alert(r.message || '已归档');
+    loadMyTemplates(); loadContentAssetStats();
+  } catch (e) { alert('归档失败: ' + e.message); }
+}
+
+// ════════════════════════════════════════
 // 🔍 竞争情报 v1.2
 // ════════════════════════════════════════
 
@@ -6307,6 +8175,563 @@ async function generateWeeklyReport() {
     alert('周报已生成！\n\n摘要: '+(r.executive_summary||'').substring(0,200));
   } catch(e) { alert('生成失败: '+e.message); }
 }
-</script>
+
+// ════════════════════════════════════════════════════════════════
+// 🤖 AI 运营 Agent (P2-8)
+// ════════════════════════════════════════════════════════════════
+var AG_API = '/api/agent';
+var AG_CURRENT_VIEW = 'agents';
+
+function switchAgentView(view, el) {
+  AG_CURRENT_VIEW = view;
+  document.querySelectorAll('#tab-agent .data-subnav .data-nav-item').forEach(function(n){
+    n.style.color = 'var(--text2)';
+    n.style.borderBottom = 'none';
+    n.style.fontWeight = '400';
+  });
+  if (el) {
+    el.style.color = 'var(--primary)';
+    el.style.borderBottom = '2px solid var(--primary)';
+    el.style.fontWeight = '600';
+  }
+  ['agents','approvals','runs'].forEach(function(v){
+    var d = document.getElementById('agView-'+v);
+    if (d) d.style.display = v===view ? 'block' : 'none';
+  });
+  if (view==='agents') loadAgentList();
+  else if (view==='approvals') loadAgentApprovals();
+  else if (view==='runs') loadAgentRuns();
+}
+
+async function loadAgentDashboard() {
+  switchAgentView('agents', document.querySelector('#tab-agent .data-subnav .data-nav-item'));
+  // 看板
+  try {
+    var res = await apiFetch(AG_API+'/dashboard');
+    var d = res.data || {};
+    document.getElementById('agTotalAgents').textContent = d.total_agents || 0;
+    document.getElementById('agActiveAgents').textContent = '运行中 '+(d.active_agents||0);
+    document.getElementById('agPendingApprovals').textContent = d.pending_approvals || 0;
+    var f = d.funnel_7d || {};
+    document.getElementById('agAuto7d').textContent = f.auto || 0;
+    document.getElementById('agEscalated7d').textContent = '升级 '+(f.escalated||0);
+    document.getElementById('agFunnel').innerHTML =
+      '发现 '+(f.discover||0)+' → 生成 '+(f.generate||0)+'<br>执行 '+(f.execute||0)+' → 跟进 '+(f.followup||0);
+    // 侧边栏 badge
+    var badge = document.getElementById('agentApprovalBadge');
+    if (d.pending_approvals > 0) { badge.style.display='inline-flex'; badge.textContent = d.pending_approvals; }
+    else badge.style.display='none';
+    var navBadge = document.getElementById('agApprovalNavBadge');
+    if (navBadge) { if (d.pending_approvals>0){navBadge.style.display='inline';navBadge.textContent=d.pending_approvals;} else navBadge.style.display='none'; }
+  } catch(e) { console.error('agent dashboard', e); }
+  loadAgentList();
+}
+
+async function loadAgentList() {
+  var body = document.getElementById('agAgentsBody');
+  body.innerHTML = '<div style="color:var(--text2);padding:20px">加载中...</div>';
+  try {
+    var res = await apiFetch(AG_API+'/agents');
+    var data = res.data || [];
+    if (!data.length) {
+      body.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text2);padding:40px">'+
+        '<div style="font-size:40px;margin-bottom:8px">🤖</div>'+
+        '<div style="margin-bottom:12px">还没有 AI 运营 Agent</div>'+
+        '<button class="btn btn-primary" onclick="showAgentCreateModal()" style="background:#6366f1;color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 18px;cursor:pointer">创建第一个 Agent</button></div>';
+      return;
+    }
+    body.innerHTML = data.map(function(a){
+      var modeColor = a.mode==='auto_pilot' ? '#10b981' : (a.mode==='paused' ? '#94a3b8' : '#f59e0b');
+      var modeName = a.mode==='auto_pilot' ? '全自动' : (a.mode==='paused' ? '已暂停' : '审批模式');
+      var stages = a.stages || {};
+      var stageBadges = ['discover','generate','execute','followup'].map(function(s){
+        var on = stages[s];
+        var name = {discover:'发现',generate:'生成',execute:'执行',followup:'跟进'}[s];
+        return '<span style="font-size:10px;padding:2px 6px;border-radius:8px;'+
+          (on?'background:rgba(16,185,129,0.15);color:#059669':'background:rgba(148,163,184,0.15);color:#94a3b8')+'">'+name+'</span>';
+      }).join(' ');
+      var statusLight = a.is_active ? '#10b981' : '#cbd5e1';
+      var stats = a.stats || {};
+      return '<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column">'+
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
+          '<span style="width:8px;height:8px;border-radius:50%;background:'+statusLight+';display:inline-block"></span>'+
+          '<strong style="flex:1;font-size:15px">'+esc(a.name)+'</strong>'+
+          '<span style="font-size:11px;padding:3px 8px;border-radius:10px;background:'+modeColor+'20;color:'+modeColor+';font-weight:600">'+modeName+'</span>'+
+        '</div>'+
+        '<div style="font-size:12px;color:var(--text2);margin-bottom:10px">间隔 '+a.interval_minutes+'分钟 · 最低分 '+a.thresholds.min_hot_score+' · 目标 '+(a.target_platforms.length?a.target_platforms.join('/'):'全部')+'</div>'+
+        '<div style="margin-bottom:10px">'+stageBadges+'</div>'+
+        '<div style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.6">'+
+          '累计运行 '+(stats.total_runs||0)+' 次 · 自动 '+(stats.total_auto||0)+' · 升级 '+(stats.total_escalated||0)+'<br>'+
+          (a.last_run_at ? '上次运行：'+fmtTime(a.last_run_at)+' ('+(stats.last_run_status||'-')+')' : '尚未运行')+
+        '</div>'+
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:auto">'+
+          (a.is_active
+            ? '<button class="btn-link" onclick="stopAgent('+a.id+')" style="color:#f59e0b">⏸ 停止</button>'
+            : '<button class="btn-link" onclick="startAgent('+a.id+')" style="color:#10b981">▶ 启动</button>')+
+          '<button class="btn-link" onclick="runAgentNow('+a.id+')" style="color:#3b82f6">⚡ 立即运行</button>'+
+          '<button class="btn-link" onclick="showAgentEditModal('+a.id+')">✏ 编辑</button>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  } catch(e) { body.innerHTML = '<div style="color:#ef4444;padding:20px">加载失败: '+esc(e.message)+'</div>'; }
+}
+
+function showAgentCreateModal() {
+  document.getElementById('agentModalTitle').textContent = '新建 AI 运营 Agent';
+  document.getElementById('agEditId').value = '';
+  document.getElementById('agName').value = '';
+  document.getElementById('agMode').value = 'approval_required';
+  document.getElementById('agInterval').value = 60;
+  document.getElementById('agMinScore').value = 60;
+  document.getElementById('agMaxTopics').value = 5;
+  document.getElementById('agMaxPublish').value = 3;
+  document.getElementById('agMaxFollowups').value = 10;
+  document.querySelectorAll('#agPlatforms input').forEach(function(c){ c.checked = false; });
+  document.getElementById('agStageDiscover').checked = true;
+  document.getElementById('agStageGenerate').checked = true;
+  document.getElementById('agStageExecute').checked = true;
+  document.getElementById('agStageFollowup').checked = true;
+  document.getElementById('agAutoPublish').checked = false;
+  document.getElementById('agActive').checked = false;
+  document.getElementById('agWebhook').value = '';
+  document.getElementById('agentModal').style.display = 'flex';
+}
+
+async function showAgentEditModal(id) {
+  try {
+    var res = await apiFetch(AG_API+'/agents/'+id);
+    var a = res.data || {};
+    document.getElementById('agentModalTitle').textContent = '编辑 Agent：'+a.name;
+    document.getElementById('agEditId').value = a.id;
+    document.getElementById('agName').value = a.name;
+    document.getElementById('agMode').value = a.mode;
+    document.getElementById('agInterval').value = a.interval_minutes;
+    document.getElementById('agMinScore').value = a.thresholds.min_hot_score;
+    document.getElementById('agMaxTopics').value = a.thresholds.max_topics_per_run;
+    document.getElementById('agMaxPublish').value = a.thresholds.max_publish_per_run;
+    document.getElementById('agMaxFollowups').value = a.thresholds.max_followups_per_run;
+    document.querySelectorAll('#agPlatforms input').forEach(function(c){
+      c.checked = (a.target_platforms||[]).indexOf(c.value) >= 0;
+    });
+    document.getElementById('agStageDiscover').checked = a.stages.discover;
+    document.getElementById('agStageGenerate').checked = a.stages.generate;
+    document.getElementById('agStageExecute').checked = a.stages.execute;
+    document.getElementById('agStageFollowup').checked = a.stages.followup;
+    document.getElementById('agAutoPublish').checked = a.auto_publish_enabled;
+    document.getElementById('agActive').checked = a.is_active;
+    document.getElementById('agWebhook').value = a.webhook_url || '';
+    document.getElementById('agentModal').style.display = 'flex';
+  } catch(e) { alert('加载失败: '+e.message); }
+}
+
+function closeAgentModal() { document.getElementById('agentModal').style.display = 'none'; }
+
+async function saveAgent() {
+  var id = document.getElementById('agEditId').value;
+  var name = document.getElementById('agName').value.trim();
+  if (!name) { alert('请输入名称'); return; }
+  var platforms = [];
+  document.querySelectorAll('#agPlatforms input:checked').forEach(function(c){ platforms.push(c.value); });
+  var payload = {
+    name: name,
+    mode: document.getElementById('agMode').value,
+    interval_minutes: parseInt(document.getElementById('agInterval').value)||60,
+    stage_discover: document.getElementById('agStageDiscover').checked,
+    stage_generate: document.getElementById('agStageGenerate').checked,
+    stage_execute: document.getElementById('agStageExecute').checked,
+    stage_followup: document.getElementById('agStageFollowup').checked,
+    min_hot_score: parseFloat(document.getElementById('agMinScore').value)||60,
+    max_topics_per_run: parseInt(document.getElementById('agMaxTopics').value)||5,
+    max_publish_per_run: parseInt(document.getElementById('agMaxPublish').value)||3,
+    max_followups_per_run: parseInt(document.getElementById('agMaxFollowups').value)||10,
+    target_platforms: platforms,
+    auto_publish_enabled: document.getElementById('agAutoPublish').checked,
+    webhook_url: document.getElementById('agWebhook').value.trim(),
+  };
+  try {
+    if (id) {
+      payload.is_active = document.getElementById('agActive').checked;
+      await apiFetch(AG_API+'/agents/'+id, { method:'PUT', body: JSON.stringify(payload) });
+      toast('Agent 已更新', 'success');
+    } else {
+      payload.is_active = document.getElementById('agActive').checked;
+      await apiFetch(AG_API+'/agents', { method:'POST', body: JSON.stringify(payload) });
+      toast('Agent 创建成功', 'success');
+    }
+    closeAgentModal();
+    loadAgentDashboard();
+  } catch(e) { alert('保存失败: '+e.message); }
+}
+
+async function startAgent(id) {
+  try { await apiFetch(AG_API+'/agents/'+id+'/start', { method:'POST' }); toast('Agent 已启动', 'success'); loadAgentDashboard(); }
+  catch(e) { alert('启动失败: '+e.message); }
+}
+async function stopAgent(id) {
+  if (!(await confirmAction('确认停止该 Agent？停止后将不再自动运行。'))) return;
+  try { await apiFetch(AG_API+'/agents/'+id+'/stop', { method:'POST' }); toast('Agent 已停止', 'success'); loadAgentDashboard(); }
+  catch(e) { alert('停止失败: '+e.message); }
+}
+async function runAgentNow(id) {
+  if (!(await confirmAction('确认立即运行该 Agent 一次？'))) return;
+  toast('Agent 启动中...', 'info');
+  try {
+    var r = await apiFetch(AG_API+'/agents/'+id+'/run', { method:'POST' });
+    // 非阻塞模式：返回 {run_id, agent_id, status:'running'}
+    var runId = r.data && (r.data.run_id || (r.data.run && r.data.run.id));
+    if (runId) {
+      toast('Agent 已在后台运行 (run#'+runId+')，正在跟踪进度...', 'info');
+      pollAgentRun(id, runId);
+    } else {
+      // 兼容同步模式：直接返回 run 对象
+      var run = (r.data && r.data.run) || {};
+      toast('运行完成：'+(run.status||'')+' · 自动 '+(run.auto_count||0)+' · 升级 '+(run.escalated_count||0), 'success');
+      loadAgentDashboard();
+    }
+  } catch(e) { alert('运行失败: '+e.message); }
+}
+
+// 轮询 Agent 运行状态直到完成（非阻塞模式配套）
+async function pollAgentRun(agentId, runId, attempts) {
+  attempts = attempts || 0;
+  if (attempts > 60) { // 最多轮询 ~5 分钟（60×5s）
+    toast('Agent 运行超时，请稍后查看运行历史', 'warning');
+    loadAgentDashboard();
+    return;
+  }
+  await new Promise(function(r){ setTimeout(r, 5000); });
+  try {
+    var r = await apiFetch(AG_API+'/agents/'+agentId+'/runs?limit=5');
+    var runs = r.data || [];
+    var run = runs.find(function(x){ return x.id === runId; });
+    if (!run) { toast('运行记录未找到', 'warning'); return; }
+    if (run.status === 'running') {
+      // 仍在运行，继续轮询
+      pollAgentRun(agentId, runId, attempts + 1);
+      return;
+    }
+    // 运行完成
+    var msg = '运行'+(run.status==='success'?'完成':'结束')+'：发现 '+or0(run.discover_count)+' · 生成 '+or0(run.generate_count)+
+              ' · 执行 '+or0(run.execute_count)+' · 跟进 '+or0(run.followup_count)+' · 自动 '+or0(run.auto_count)+' · 升级 '+or0(run.escalated_count);
+    toast(msg, run.status==='success'?'success':'warning');
+    loadAgentDashboard();
+  } catch(e) {
+    console.error('轮询 Agent 运行失败:', e);
+    pollAgentRun(agentId, runId, attempts + 1);
+  }
+}
+function or0(v){ return v || 0; }
+
+// 审批队列
+async function loadAgentApprovals() {
+  var body = document.getElementById('agApprovalsBody');
+  body.innerHTML = '<div style="color:var(--text2);padding:20px">加载中...</div>';
+  var status = document.getElementById('agApprovalFilter').value;
+  var risk = document.getElementById('agApprovalRisk').value;
+  try {
+    var url = AG_API+'/approvals?status='+status;
+    if (risk) url += '&risk_level='+risk;
+    var res = await apiFetch(url);
+    var data = res.data || [];
+    if (!data.length) { body.innerHTML = '<div style="text-align:center;color:var(--text2);padding:30px">'+(status==='pending'?'🎉 暂无待审批项':'暂无记录')+'</div>'; return; }
+    var riskColor = {high:'#ef4444', medium:'#f59e0b', low:'#10b981'};
+    var riskName = {high:'高', medium:'中', low:'低'};
+    body.innerHTML = '<table class="data-table" style="width:100%"><thead><tr>'+
+      '<th>类型</th><th>标题</th><th>风险</th><th>原因</th><th>内容预览</th><th>时间</th><th>操作</th></tr></thead><tbody>'+
+      data.map(function(ap){
+        var typeMap = {task:'发布任务', content:'内容', followup:'跟进'};
+        var preview = esc((ap.content_preview||'').substring(0,80))+(ap.content_preview&&ap.content_preview.length>80?'...':'');
+        var actions = ap.status==='pending'
+          ? '<button class="btn btn-green btn-sm" onclick="approveAgentItem('+ap.id+')" style="background:#10b981;color:#fff;border:none;border-radius:var(--radius-sm);padding:4px 10px;font-size:12px;cursor:pointer">通过</button> '+
+            '<button class="btn btn-sm" onclick="rejectAgentItem('+ap.id+')" style="background:#ef4444;color:#fff;border:none;border-radius:var(--radius-sm);padding:4px 10px;font-size:12px;cursor:pointer">驳回</button>'
+          : '<span style="color:'+(ap.status==='approved'?'#10b981':'#ef4444')+';font-size:12px">'+(ap.status==='approved'?'已通过':'已驳回')+'</span>';
+        return '<tr>'+
+          '<td><span style="font-size:11px;padding:2px 8px;border-radius:8px;background:var(--bg);color:var(--text2)">'+(typeMap[ap.resource_type]||ap.resource_type)+'</span></td>'+
+          '<td style="max-width:180px">'+esc(ap.title||'')+'</td>'+
+          '<td><span style="color:'+(riskColor[ap.risk_level]||'#94a3b8')+';font-weight:600;font-size:12px">'+(riskName[ap.risk_level]||'-')+'</span></td>'+
+          '<td style="max-width:160px;font-size:12px;color:var(--text2)">'+esc((ap.risk_reason||'').substring(0,60))+'</td>'+
+          '<td style="max-width:260px;font-size:12px;cursor:pointer" title="'+esc(ap.content_preview||'')+'" onclick="showDetail(\'📋 审批 #'+ap.id+'\',\''+esc((ap.content_preview||'').replace(/'/g,"\\'"))+'\')">'+preview+'</td>'+
+          '<td style="font-size:11px;color:var(--text2)">'+fmtTime(ap.created_at)+'</td>'+
+          '<td>'+actions+'</td>'+
+        '</tr>';
+      }).join('')+
+      '</tbody></table>';
+  } catch(e) { body.innerHTML = '<div style="color:#ef4444;padding:20px">加载失败: '+esc(e.message)+'</div>'; }
+}
+
+async function approveAgentItem(id) {
+  var note = prompt('审批备注（可选）：', '') || '';
+  try { await apiFetch(AG_API+'/approvals/'+id+'/approve', { method:'POST', body: JSON.stringify({note:note}) }); toast('已通过并回放执行', 'success'); loadAgentDashboard(); }
+  catch(e) { alert('审批失败: '+e.message); }
+}
+async function rejectAgentItem(id) {
+  var note = prompt('驳回原因（可选）：', '') || '';
+  try { await apiFetch(AG_API+'/approvals/'+id+'/reject', { method:'POST', body: JSON.stringify({note:note}) }); toast('已驳回', 'success'); loadAgentDashboard(); }
+  catch(e) { alert('操作失败: '+e.message); }
+}
+
+// 运行历史
+async function loadAgentRuns() {
+  var body = document.getElementById('agRunsBody');
+  body.innerHTML = '<div style="color:var(--text2);padding:20px">加载中...</div>';
+  try {
+    var agentsRes = await apiFetch(AG_API+'/agents');
+    var agents = agentsRes.data || [];
+    if (!agents.length) { body.innerHTML = '<div style="text-align:center;color:var(--text2);padding:30px">暂无 Agent</div>'; return; }
+    // 取每个 agent 最近运行合并
+    var allRuns = [];
+    for (var i=0;i<agents.length;i++){
+      try {
+        var r = await apiFetch(AG_API+'/agents/'+agents[i].id+'/runs?limit=10');
+        (r.data||[]).forEach(function(run){ run.agent_name = agents[i].name; allRuns.push(run); });
+      } catch(e){}
+    }
+    allRuns.sort(function(a,b){ return (b.started_at||'').localeCompare(a.started_at||''); });
+    allRuns = allRuns.slice(0, 30);
+    if (!allRuns.length) { body.innerHTML = '<div style="text-align:center;color:var(--text2);padding:30px">暂无运行记录</div>'; return; }
+    var statusColor = {success:'#10b981', partial:'#f59e0b', failed:'#ef4444', running:'#3b82f6'};
+    body.innerHTML = '<table class="data-table" style="width:100%"><thead><tr>'+
+      '<th>Agent</th><th>状态</th><th>模式</th><th>发现</th><th>生成</th><th>执行</th><th>跟进</th><th>自动</th><th>升级</th><th>开始时间</th><th>操作</th></tr></thead><tbody>'+
+      allRuns.map(function(r){
+        return '<tr>'+
+          '<td>'+esc(r.agent_name||'')+'</td>'+
+          '<td><span style="color:'+(statusColor[r.status]||'#94a3b8')+';font-weight:600;font-size:12px">'+(r.status||'-')+'</span></td>'+
+          '<td style="font-size:12px">'+(r.mode||'-')+'</td>'+
+          '<td>'+(r.discover_count||0)+'</td><td>'+(r.generate_count||0)+'</td><td>'+(r.execute_count||0)+'</td><td>'+(r.followup_count||0)+'</td>'+
+          '<td style="color:#10b981;font-weight:600">'+(r.auto_count||0)+'</td><td style="color:#f59e0b;font-weight:600">'+(r.escalated_count||0)+'</td>'+
+          '<td style="font-size:11px;color:var(--text2)">'+fmtTime(r.started_at)+'</td>'+
+          '<td><button class="btn-link" onclick="showRunDetail('+r.id+')">详情</button></td>'+
+        '</tr>';
+      }).join('')+
+      '</tbody></table>';
+  } catch(e) { body.innerHTML = '<div style="color:#ef4444;padding:20px">加载失败: '+esc(e.message)+'</div>'; }
+}
+
+async function showRunDetail(runId) {
+  try {
+    var res = await apiFetch(AG_API+'/runs/'+runId+'/decisions');
+    var data = res.data || [];
+    document.getElementById('agRunDetailTitle').textContent = '运行 #'+runId+' 决策审计（'+data.length+' 条）';
+    var decisionColor = {auto:'#10b981', approve:'#f59e0b', escalate:'#ef4444', skip:'#94a3b8'};
+    var stageName = {discover:'发现', generate:'生成', execute:'执行', followup:'跟进'};
+    var html = data.length ? '<table class="data-table" style="width:100%"><thead><tr>'+
+      '<th>阶段</th><th>动作</th><th>资源</th><th>决策</th><th>理由</th><th>时间</th></tr></thead><tbody>'+
+      data.map(function(d){
+        return '<tr>'+
+          '<td><span style="font-size:11px;padding:2px 8px;border-radius:8px;background:var(--bg);color:var(--text2)">'+(stageName[d.stage]||d.stage)+'</span></td>'+
+          '<td style="font-size:12px">'+esc(d.action||'')+'</td>'+
+          '<td style="font-size:12px">'+esc(d.resource_type||'')+(d.resource_id?'#'+d.resource_id:'')+'</td>'+
+          '<td><span style="color:'+(decisionColor[d.decision]||'#94a3b8')+';font-weight:600;font-size:12px">'+(d.decision||'-')+'</span></td>'+
+          '<td style="max-width:280px;font-size:12px;color:var(--text2)">'+esc((d.reason||'').substring(0,80))+'</td>'+
+          '<td style="font-size:11px;color:var(--text2)">'+fmtTime(d.created_at)+'</td>'+
+        '</tr>';
+      }).join('')+'</tbody></table>' : '<div style="text-align:center;color:var(--text2);padding:20px">无决策记录</div>';
+    document.getElementById('agRunDetailBody').innerHTML = html;
+    document.getElementById('agentRunDetailModal').style.display = 'flex';
+  } catch(e) { alert('加载失败: '+e.message); }
+}
+
+// ── 数据导出功能 ──
+async function loadExportPage() {
+  try {
+    // 页面已经渲染完成，这里可以用于动态加载选项
+    console.log('数据导出页面加载完成');
+  } catch(e) { console.error('loadExportPage error:', e); }
+}
+
+async function exportData(dataType, format) {
+  try {
+    toast('正在导出数据...', 'info');
+    
+    // 构建请求参数
+    var params = {
+      data_type: dataType,
+      format: format,
+      include_selected: document.getElementById('exportLeadsSelected')?.checked || false
+    };
+    
+    // 发起导出请求
+    var response = await apiFetch(EXPORT_API + '/data', {
+      method: 'POST',
+      body: JSON.stringify(params)
+    });
+    
+    if (response.status === 'success') {
+      // 创建下载链接
+      var downloadUrl = response.download_url;
+      var filename = response.filename || `export_${dataType}_${new Date().getTime()}.${format}`;
+      
+      // 创建隐藏的下载链接并触发下载
+      var link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast(`数据导出成功: ${filename}`, 'success');
+    } else {
+      throw new Error(response.message || '导出失败');
+    }
+  } catch(e) {
+    toast('导出失败: ' + e.message, 'error');
+    console.error('exportData error:', e);
+  }
+}
+
+function toggleLeadsSelection() {
+  var checkbox = document.getElementById('exportLeadsSelected');
+  var leadsSection = document.querySelector('.panel-card:nth-child(2)');
+  if (checkbox && checkbox.checked) {
+    leadsSection.style.opacity = '0.7';
+    leadsSection.style.border = '2px solid var(--primary)';
+  } else {
+    leadsSection.style.opacity = '1';
+    leadsSection.style.border = 'none';
+  }
+}
+
+// ── 数据备份功能 ──
+async function loadBackupPage() {
+  try {
+    console.log('数据备份页面加载');
+    // 加载备份配置和备份历史
+    await loadBackupConfig();
+    await refreshBackupList();
+  } catch(e) { console.error('loadBackupPage error:', e); }
+}
+
+async function loadBackupConfig() {
+  try {
+    var response = await apiFetch(EXPORT_API + '/backup/config');
+    if (response.status === 'success') {
+      var config = response.data || {};
+      
+      // 更新UI控件
+      document.getElementById('backupEnabled').checked = config.enabled || false;
+      document.getElementById('backupTime').value = config.backup_time || '02:00';
+      document.getElementById('backupFrequency').value = config.backup_days || '7';
+      document.getElementById('backupRetention').value = config.retention_days || '30';
+    }
+  } catch(e) {
+    console.error('加载备份配置失败:', e);
+  }
+}
+
+async function updateBackupConfig() {
+  try {
+    var config = {
+      enabled: document.getElementById('backupEnabled').checked,
+      backup_time: document.getElementById('backupTime').value,
+      backup_days: parseInt(document.getElementById('backupFrequency').value),
+      retention_days: parseInt(document.getElementById('backupRetention').value)
+    };
+    
+    var response = await apiFetch(EXPORT_API + '/backup/config', {
+      method: 'POST',
+      body: JSON.stringify(config)
+    });
+    
+    if (response.status === 'success') {
+      toast('备份配置已更新', 'success');
+    } else {
+      throw new Error(response.message || '更新失败');
+    }
+  } catch(e) {
+    toast('配置更新失败: ' + e.message, 'error');
+  }
+}
+
+async function manualBackup() {
+  try {
+    toast('正在创建手动备份...', 'info');
+    
+    var response = await apiFetch(EXPORT_API + '/backup/manual', {
+      method: 'POST'
+    });
+    
+    if (response.status === 'success') {
+      toast('手动备份创建成功', 'success');
+      // 刷新备份列表
+      await refreshBackupList();
+    } else {
+      throw new Error(response.message || '备份失败');
+    }
+  } catch(e) {
+    toast('手动备份失败: ' + e.message, 'error');
+  }
+}
+
+async function refreshBackupList() {
+  try {
+    var response = await apiFetch(EXPORT_API + '/backup/list');
+    var backupList = document.getElementById('backupList');
+    
+    if (response.status === 'success') {
+      var backups = response.data || [];
+      
+      if (!backups.length) {
+        backupList.innerHTML = '<div style="color:var(--text2);text-align:center;padding:40px;font-style:italic">暂无备份记录</div>';
+        return;
+      }
+      
+      // 生成备份列表HTML
+      var html = backups.map(function(backup) {
+        var sizeText = (backup.size / 1024 / 1024).toFixed(2) + ' MB';
+        var statusColor = backup.status === 'completed' ? '#10b981' : backup.status === 'failed' ? '#ef4444' : '#f59e0b';
+        var statusText = backup.status === 'completed' ? '已完成' : backup.status === 'failed' ? '失败' : '进行中';
+        
+        return '<div class="backup-item" style="padding:12px;border-radius:8px;background:var(--bg);margin-bottom:8px;border-left:4px solid ' + statusColor + '">'+
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start">'+
+            '<div>'+
+              '<div style="font-weight:600;color:var(--text);margin-bottom:4px">' + (backup.filename || '备份文件') + '</div>'+
+              '<div style="font-size:12px;color:var(--text2)">' + fmtTime(backup.created_at) + ' · ' + sizeText + '</div>'+
+            '</div>'+
+            '<div>'+
+              '<span style="color:' + statusColor + ';font-size:12px;font-weight:600">' + statusText + '</span>'+
+              (backup.status === 'completed' ? 
+                '<button class="btn btn-outline btn-sm" onclick="downloadBackup(\'' + backup.id + '\')" style="margin-left:8px;padding:4px 8px;font-size:11px">下载</button>' :
+                '') +
+            '</div>'+
+          '</div>'+
+        '</div>';
+      }).join('');
+      
+      backupList.innerHTML = html;
+    }
+  } catch(e) {
+    document.getElementById('backupList').innerHTML = '<div style="color:#ef4444;padding:20px;text-align:center">加载失败: ' + e.message + '</div>';
+    console.error('refreshBackupList error:', e);
+  }
+}
+
+async function downloadBackup(backupId) {
+  try {
+    toast('正在准备下载...', 'info');
+    
+    var response = await apiFetch(EXPORT_API + '/backup/download/' + backupId);
+    if (response.status === 'success') {
+      var downloadUrl = response.download_url;
+      var filename = response.filename;
+      
+      // 创建下载链接
+      var link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast('下载已开始', 'success');
+    } else {
+      throw new Error(response.message || '下载失败');
+    }
+  } catch(e) {
+    toast('下载失败: ' + e.message, 'error');
+  }
+}
+  </script>
 </body>
 </html>
