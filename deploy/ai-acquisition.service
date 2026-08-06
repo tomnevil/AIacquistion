@@ -1,0 +1,20 @@
+[Unit]
+Description=AI Acquisition System
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/projects/AI-Acquisition
+EnvironmentFile=/root/projects/AI-Acquisition/.env
+ExecStart=/usr/bin/python3 /root/projects/AI-Acquisition/main.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/root/projects/AI-Acquisition/logs/server.log
+StandardError=append:/root/projects/AI-Acquisition/logs/error.log
+
+# 防止日志文件过大
+LogRateLimitIntervalSec=0
+
+[Install]
+WantedBy=multi-user.target
