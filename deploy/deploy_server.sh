@@ -46,7 +46,9 @@ git pull origin main
 
 # ---- 3. 安装/更新依赖 ----
 log_info "安装 Python 依赖..."
-$PYTHON_BIN -m pip install -r requirements.txt --quiet
+$PYTHON_BIN -m pip install -r requirements.txt --quiet --break-system-packages 2>/dev/null || \
+$PYTHON_BIN -m pip install -r requirements.txt --quiet || \
+log_warn "pip install 跳过(可能已安装)"
 
 # ---- 4. 数据库迁移 ----
 log_info "执行数据库迁移..."
