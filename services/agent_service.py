@@ -304,21 +304,37 @@ def _stage_discover(agent: Agent, run: AgentRun, db: Session) -> List[Dict[str, 
     topics_q = db.query(HotTopic).filter(
         HotTopic.final_score >= agent.min_hot_score,
         HotTopic.status.in_(["new", "scored"]),
-        HotTopic.expires_at > datetime.utcnow(),
+        or_(
+            HotTopic.expires_at > datetime.utcnow(),
+            HotTopic.expires_at.is_(None),  # NULL = 永不过期
+        ),
     )
     if agent.user_id is not None:
         topics_q = topics_q.filter(or_(HotTopic.user_id == agent.user_id, HotTopic.user_id.is_(None)))
     hot_topics = topics_q.order_by(desc(HotTopic.final_score)).limit(agent.max_topics_per_run).all()
 
     for ht in hot_topics:
-        # 避免重复：检查是否已为该热点建过选题
+        # 检查是否已有对应选题
         existing = db.query(TopicLibrary).filter(
             TopicLibrary.source == "hot_search",
             TopicLibrary.hot_url == ht.url,
         ).first()
         if existing:
-            _log_decision(db, run, agent, "discover", "fetch_topic", "topic", ht.id,
-                          "skip", "已存在对应选题，跳过", {"title": ht.title, "score": ht.final_score})
+            # 如果已有选题但状态为 draft，应纳入生成阶段
+            if existing.status == "draft":
+                opportunities.append({
+                    "topic_id": existing.id,
+                    "hot_topic_id": ht.id,
+                    "title": ht.title,
+                    "platform": ht.source_platform,
+                    "score": float(ht.final_score or 0),
+                })
+                _log_decision(db, run, agent, "discover", "fetch_topic", "topic", ht.id,
+                              "auto", f"热点分 {ht.final_score:.1f}，已有选题草稿(draft)，纳入生成",
+                              {"title": ht.title, "score": float(ht.final_score or 0)})
+            else:
+                _log_decision(db, run, agent, "discover", "fetch_topic", "topic", ht.id,
+                              "skip", "已存在对应选题，跳过", {"title": ht.title, "score": ht.final_score})
             continue
 
         # 建 TopicLibrary 草稿
