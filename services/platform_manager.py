@@ -49,6 +49,7 @@ class PlatformManager:
         - "在知乎找关于XX的问题，准备写回答"
         """
         platform_name = account["platform"]
+        account = {**account, "headless": True}  # 目标发现后台化
         platform_cls = get_platform(platform_name, account)
 
         # 合并业务关键词和平台发现关键词
@@ -581,6 +582,7 @@ class PlatformManager:
 
     async def login_account(self, account: dict) -> dict:
         """手动登录账号, 保存 Cookie"""
+        account = {**account, "headless": False}  # 扫码登录需要可见窗口
         platform = get_platform(account["platform"], account)
         await self.start()
         try:
@@ -589,10 +591,11 @@ class PlatformManager:
             return {"account_id": account["id"], "logged_in": success}
         finally:
             await platform.teardown()
-            await self.stop()
+            # 不调用 self.stop()：会杀掉所有账号的常驻浏览器（cookie 持久化依赖上下文存活）
 
     async def health_check(self, account: dict) -> dict:
         """检测账号是否存活"""
+        account = {**account, "headless": True}  # 健康检查后台化
         platform = get_platform(account["platform"], account)
         await self.start()
         try:
@@ -605,10 +608,11 @@ class PlatformManager:
             }
         finally:
             await platform.teardown()
-            await self.stop()
+            # 不调用 self.stop()，理由同 login_account
 
     async def sync_account_stats(self, account: dict) -> dict:
         """同步账号统计数据"""
+        account = {**account, "headless": True}  # 统计同步后台化
         platform = get_platform(account["platform"], account)
         await self.start()
         try:
@@ -626,7 +630,7 @@ class PlatformManager:
             }
         finally:
             await platform.teardown()
-            await self.stop()
+            # 不调用 self.stop()，理由同 login_account
 
     # ═══════════════════════════════════════════════════
     #  启动 & 清理（已委托给 BrowserEngine 的引用计数机制）

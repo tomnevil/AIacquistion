@@ -201,6 +201,14 @@ def list_accounts(
     return {"total": len(accounts), "data": [a.to_public_dict() for a in accounts]}
 
 
+@router.post("/accounts/park-windows")
+async def park_all_windows(current_user: User = Depends(get_current_user)):
+    """把所有常驻浏览器窗口收纳回屏幕外（不影响登录态，勿关闭窗口本身）"""
+    from platforms.browser_engine import browser_engine
+    parked = await browser_engine.park_all_windows()
+    return {"parked": parked}
+
+
 @router.get("/accounts/{account_id}")
 def get_account(account_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     acc = _own_or_admin(PlatformAccount, account_id, current_user, db)
@@ -1706,6 +1714,9 @@ async def execute_post_answer(
     try:
         await browser_engine.start()
         await platform.setup()
+        # 常驻窗口平时停在屏幕外，写回答需人工可观测 → 拉回屏幕
+        if platform.page:
+            await browser_engine.bring_window_to_front(platform.page)
         logged = await platform.login()
         if not logged:
             raise Exception("平台登录失败，请先手动登录知乎账号")
@@ -1726,10 +1737,8 @@ async def execute_post_answer(
             await platform.teardown()
         except Exception:
             pass
-        try:
-            await browser_engine.stop()
-        except Exception:
-            pass
+        # 注意：不要在每次操作后调用 browser_engine.stop() —— 它会杀掉所有账号的常驻浏览器，
+        # 导致并发的登录/监控/评论全部 TargetClosedError。上下文由应用关停时统一释放。
 
     if result.get("success"):
         item.is_replied = True
@@ -1773,6 +1782,9 @@ async def execute_reply(
     try:
         platform = get_platform(account.platform, account.to_dict())
         await platform.setup()
+        # 常驻窗口平时停在屏幕外，回复需人工可观测 → 拉回屏幕
+        if platform.page:
+            await browser_engine.bring_window_to_front(platform.page)
 
         logged = await platform.login()
         if not logged:
@@ -1804,6 +1816,17 @@ async def execute_reply(
     item.is_read = True
     db.commit()
     return {"id": inbox_id, "replied": True, "reply_text": reply_text}
+
+
+@router.post("/inbox/process-invites")
+async def trigger_invite_batch(
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
+):
+    """手动触发知乎邀请回答批次（受每日限额约束，后台执行看日志）"""
+    from services.invite_answer_service import process_pending_invites
+    background_tasks.add_task(process_pending_invites)
+    return {"triggered": True, "note": "批次后台执行中，进度见服务日志"}
 
 
 @router.post("/inbox/check-now")
@@ -1879,10 +1902,7 @@ async def debug_notifications(
             await platform.teardown()
         except Exception:
             pass
-        try:
-            await browser_engine.stop()
-        except Exception:
-            pass
+        # 同上：保留常驻浏览器上下文，不在操作后全局 stop()
 
     return {
         "account_id": account_id,

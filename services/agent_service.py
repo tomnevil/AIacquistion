@@ -847,6 +847,54 @@ def approve_approval(approval_id: int, user_id: int, note: str = "", db: Session
                     status="sent",
                     sent_at=datetime.utcnow(),
                 ))
+        elif ap.resource_type == "content":
+            # 审批通过内容 → 重新进入执行队列：按执行阶段写法创建发布任务
+            # （人工已批准，视为风控放行；无可用账号则保持 pending 便于补充账号后重试）
+            cl = db.query(ContentLibrary).filter(ContentLibrary.id == ap.resource_id).first()
+            if not cl:
+                return {"success": False, "message": "关联内容不存在"}
+            platform = payload.get("platform") or cl.platform
+            content_text = cl.template or ""
+            title = payload.get("title") or (
+                content_text.strip().splitlines()[0] if content_text.strip() else ""
+            ) or (ap.title or "")
+
+            account = _pick_account_for_platform(platform, cl.user_id, db)
+            if not account:
+                return {"success": False, "message": f"无可用 {platform} 账号，无法创建发布任务"}
+
+            task = PlatformTask(
+                user_id=cl.user_id,
+                account_id=account.id,
+                platform=platform,
+                task_type=TaskType.PUBLISH.value,
+                target_title=title[:200],
+                ai_content=content_text,
+                final_content=content_text,
+                status=PlatformTaskStatus.SCHEDULED.value,
+                source_template_id=cl.id,
+                scheduled_at=datetime.utcnow() + timedelta(minutes=5),
+            )
+            db.add(task)
+            db.flush()
+            try:
+                from services.scheduler import schedule_task
+                schedule_task(task.id, datetime.utcnow() + timedelta(minutes=5))
+            except Exception as e:
+                logger.warning(f"审批后调度内容任务失败 task={task.id}: {e}")
+            risk_control.record_action({"id": account.id, "platform": platform}, "publish")
+            cl.status = "active"  # draft → active（已批准，进入发布流程）
+
+            # 审计决策补记到原 run（run 可能已结束，仅补审计记录）
+            agent = db.query(Agent).filter(Agent.id == ap.agent_id).first()
+            run = db.query(AgentRun).filter(AgentRun.id == ap.run_id).first() if ap.run_id else None
+            if agent and run:
+                _log_decision(db, run, agent, "execute", "create_task", "task", task.id,
+                              "auto", f"审批 #{ap.id} 通过，内容#{cl.id} 已创建发布任务(账号#{account.id})",
+                              {"approval_id": ap.id, "content_id": cl.id, "task_id": task.id,
+                               "account_id": account.id, "platform": platform})
+            logger.info(f"审批 #{approval_id} 内容#{cl.id} 已创建发布任务 "
+                        f"task={task.id} account={account.id} platform={platform}")
 
         db.commit()
         logger.info(f"审批 #{approval_id} 已通过 by user={user_id}")

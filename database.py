@@ -6,7 +6,9 @@ import enum
 
 from config import settings
 
-engine = create_engine(settings.DATABASE_URL, echo=settings.DEBUG)
+# SQLite 多写者（服务 scheduler + 运维脚本）下默认 5s busy 等待易触发 database is locked，延长到 30s
+_sqlite_kwargs = {"connect_args": {"timeout": 30}} if settings.DATABASE_URL.startswith("sqlite") else {}
+engine = create_engine(settings.DATABASE_URL, echo=settings.DEBUG, **_sqlite_kwargs)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 

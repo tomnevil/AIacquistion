@@ -46,9 +46,43 @@ class BaseSocialPlatform(ABC):
         self.page = await browser_engine.new_page(self.account)
 
     async def teardown(self):
-        """关闭页面"""
-        if self.page:
-            await self.page.close()
+        """关闭页面 — 但保留上下文常驻
+
+        关闭 persistent 上下文的最后一个页面会导致浏览器进程退出，
+        内存中的会话级 cookie（公众号/小红书等）随之丢失且不落盘，
+        下次重建上下文即掉线。故唯一页面时导航到空白页代替关闭，
+        并将窗口移到屏幕外避免打扰。
+        """
+        try:
+            if not self.page:
+                return
+            ctx = self.page.context
+            pages = ctx.pages
+            if len(pages) <= 1:
+                # 唯一页面：导航空白页保持上下文存活
+                try:
+                    await self.page.goto("about:blank", wait_until="domcontentloaded", timeout=10000)
+                except Exception:
+                    pass
+                # 把窗口移到屏幕外，避免空白窗口留在屏幕上
+                try:
+                    session = await ctx.new_cdp_session(self.page)
+                    info = await session.send("Browser.getWindowForTarget")
+                    wid = info.get("windowId")
+                    await session.send("Browser.setWindowBounds", {
+                        "windowId": wid, "bounds": {"windowState": "normal"},
+                    })
+                    await session.send("Browser.setWindowBounds", {
+                        "windowId": wid, "bounds": {"left": -32000, "top": -32000},
+                    })
+                    await session.detach()
+                except Exception:
+                    pass
+            else:
+                await self.page.close()
+        except Exception:
+            pass
+        self.page = None
 
     # ── 子类必须实现的核心方法 ──
 
@@ -94,6 +128,14 @@ class BaseSocialPlatform(ABC):
         Returns: {"follower_count": int, "content_count": int, "works": [{"title": str, "views": int, "likes": int, "comments": int, "shares": int}]}
         """
         ...
+
+    async def get_post_metrics(self, post_url: str) -> Optional[dict]:
+        """获取单篇已发布内容的效果数据 — 内容效果回采 (24h/72h/7d 检查点)
+
+        Returns: {"views": int, "likes": int, "comments": int, "shares": int, "bookmarks": int}
+        平台未实现时返回 None，调度器跳过该任务并稍后重试
+        """
+        return None
 
     # ── 通用辅助方法 ──
 

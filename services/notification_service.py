@@ -171,6 +171,7 @@ class NotificationService:
                 return result
 
             account_dict = account.to_dict()
+            account_dict["headless"] = True  # 巡检后台化，不弹浏览器窗口
             platform_name = account.platform
 
             # 使用统一的平台注册表

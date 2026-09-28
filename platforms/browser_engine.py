@@ -63,6 +63,7 @@ class BrowserEngine:
         self._playwright = None
         self._browsers: dict[str, Browser] = {}
         self._contexts: dict[int, BrowserContext] = {}
+        self._context_headless: dict[int, bool] = {}  # 记录各账号上下文是否无头
         self._ref_count = 0  # 引用计数
         self._lock = asyncio.Lock()  # 保护并发启动/停止
 
@@ -86,6 +87,7 @@ class BrowserEngine:
                 except:
                     pass
             self._contexts.clear()
+            self._context_headless.clear()
             for browser in self._browsers.values():
                 try:
                     await browser.close()
@@ -133,7 +135,8 @@ class BrowserEngine:
             except:
                 pass
             del self._scrape_page
-        await self.stop()
+        # 注意：不要在这里调用 stop() —— 账号上下文是常驻的（cookie 持久化），
+        # 关闭全部浏览器只应在应用关停时由 platform_manager.stop() 触发。
 
     async def get_context(self, account: dict) -> BrowserContext:
         """
@@ -141,9 +144,29 @@ class BrowserEngine:
         每个账号有独立的 Cookie/Session 存储目录
         """
         account_id = account["id"]
+        # headless 覆盖：调用方可通过 account["headless"] 控制
+        # （巡检/健康检查/统计同步 → True 后台化；扫码登录 → False 需要可见窗口）
+        want_headless = bool(account.get("headless", settings.BROWSER_HEADLESS))
 
+        # 死引用/模式不匹配检测：上下文可能被外部关闭，或需要可见窗口但当前是无头
         if account_id in self._contexts:
-            return self._contexts[account_id]
+            ctx = self._contexts[account_id]
+            try:
+                alive = not ctx.is_closed()
+            except Exception:
+                alive = False
+            cached_headless = self._context_headless.get(account_id, True)
+            if alive and (not cached_headless or cached_headless == want_headless):
+                # 已有可见窗口直接复用（避免打断进行中的任务）；或模式一致
+                return ctx
+            if alive:
+                # 需要可见窗口但当前是无头 → 关闭重建
+                try:
+                    await ctx.close()
+                except Exception:
+                    pass
+            self._contexts.pop(account_id, None)
+            self._context_headless.pop(account_id, None)
 
         # 账号专属目录
         user_dir = self.BROWSER_DATA_DIR / f"account_{account_id}"
@@ -154,28 +177,76 @@ class BrowserEngine:
         if account.get("proxy"):
             proxy_config = {"server": account["proxy"]}
 
+        # Playwright 已被停止时自动重启
+        if self._playwright is None:
+            await self.start()
+
         # 启动浏览器
+        # 伪无头：抖音/字节等平台风控可通过 Sec-CH-UA 头、userAgentData 识别 HeadlessChrome
+        # 导致登录态被踢，故"无头"任务实际启动有头浏览器并定位到屏幕外（-32000,-32000），
+        # 物理上无法被检测，且不弹窗不打扰用户
+        launch_args = [
+            "--disable-blink-features=AutomationControlled",
+            "--disable-features=IsolateOrigins,site-per-process",
+        ]
+        if want_headless:
+            launch_args += ["--window-position=-32000,-32000", "--window-size=1280,800"]
+
         browser = await self._playwright.chromium.launch_persistent_context(
             user_data_dir=str(user_dir),
-            headless=settings.BROWSER_HEADLESS,
+            headless=False,
             proxy=proxy_config,
-            user_agent=account.get("user_agent") or self._random_ua(),
+            user_agent=self._get_stable_ua(account_id, account),
             viewport={"width": settings.BROWSER_VIEWPORT_WIDTH, "height": settings.BROWSER_VIEWPORT_HEIGHT},
             locale=settings.BROWSER_LOCALE,
             timezone_id=settings.BROWSER_TIMEZONE,
             # 反检测参数
-            args=[
-                "--disable-blink-features=AutomationControlled",
-                "--disable-features=IsolateOrigins,site-per-process",
-            ],
+            args=launch_args,
             ignore_default_args=["--enable-automation"],
         )
 
         # 注入反检测脚本 (每个页面)
         browser.on("page", lambda page: page.add_init_script(STEALTH_JS))
 
+        # 恢复会话级 cookie（无过期时间的 cookie Chromium 不落盘，进程重启后丢失；
+        # 从 save_cookies 的快照中取会话cookie注回，持久cookie由 profile 自行恢复。
+        # 只注会话cookie可避免旧快照覆盖 profile 中已轮换的持久 session）
+        try:
+            cookie_file = user_dir / "cookies.json"
+            if cookie_file.exists():
+                all_cookies = json.loads(cookie_file.read_text(encoding="utf-8"))
+                session_cookies = [
+                    c for c in all_cookies if c.get("expires", -1) == -1
+                ]
+                if session_cookies:
+                    await browser.add_cookies(session_cookies)
+                    print(f"[BrowserEngine] 账号 {account_id} 恢复 {len(session_cookies)} 个会话cookie")
+        except Exception as e:
+            print(f"[BrowserEngine] 恢复会话cookie失败: {e}")
+
         self._contexts[account_id] = browser
+        self._context_headless[account_id] = want_headless
         return browser
+
+    def _get_stable_ua(self, account_id, account: dict) -> str:
+        """获取账号稳定UA — 每个profile固定一个UA，避免指纹突变触发平台风控（抖音踢登录的根因）"""
+        if account.get("user_agent"):
+            return account["user_agent"]
+        ua_file = self.BROWSER_DATA_DIR / f"account_{account_id}" / "ua.txt"
+        if ua_file.exists():
+            try:
+                ua = ua_file.read_text(encoding="utf-8").strip()
+                if ua:
+                    return ua
+            except Exception:
+                pass
+        ua = self._random_ua()
+        try:
+            ua_file.parent.mkdir(exist_ok=True)
+            ua_file.write_text(ua, encoding="utf-8")
+        except Exception:
+            pass
+        return ua
 
     async def new_page(self, account: dict) -> Page:
         """为指定账号创建新页面，并注入反检测"""
@@ -183,6 +254,59 @@ class BrowserEngine:
         page = await context.new_page()
         await page.add_init_script(STEALTH_JS)
         return page
+
+    async def bring_window_to_front(self, page: Page):
+        """把窗口从屏幕外 (-32000) 拉回屏幕内可见位置
+
+        常驻上下文窗口平时停在屏幕外避免打扰；回复评论/写回答/发布等
+        人工可观测任务执行前调用，让用户能看到浏览器操作过程。
+        """
+        try:
+            session = await page.context.new_cdp_session(page)
+            try:
+                info = await session.send("Browser.getWindowForTarget")
+                wid = info.get("windowId")
+                await session.send("Browser.setWindowBounds", {
+                    "windowId": wid, "bounds": {"windowState": "normal"},
+                })
+                await session.send("Browser.setWindowBounds", {
+                    "windowId": wid,
+                    "bounds": {"left": 60, "top": 60, "width": 1280, "height": 800},
+                })
+            finally:
+                await session.detach()
+        except Exception:
+            pass  # 移窗失败不影响主流程
+
+    async def park_window_to_back(self, page: Page):
+        """把窗口移回屏幕外（任务结束/空闲收纳常驻窗口，不影响登录态）"""
+        try:
+            session = await page.context.new_cdp_session(page)
+            try:
+                info = await session.send("Browser.getWindowForTarget")
+                wid = info.get("windowId")
+                await session.send("Browser.setWindowBounds", {
+                    "windowId": wid, "bounds": {"windowState": "normal"},
+                })
+                await session.send("Browser.setWindowBounds", {
+                    "windowId": wid, "bounds": {"left": -32000, "top": -32000},
+                })
+            finally:
+                await session.detach()
+        except Exception:
+            pass
+
+    async def park_all_windows(self) -> int:
+        """收纳所有常驻上下文的窗口到屏幕外，返回处理数"""
+        parked = 0
+        for ctx in list(self._contexts.values()):
+            for pg in list(ctx.pages):
+                try:
+                    await self.park_window_to_back(pg)
+                    parked += 1
+                except Exception:
+                    pass
+        return parked
 
     # ── 人机行为模拟 ──
 

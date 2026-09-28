@@ -24,3 +24,7 @@ build/
 .pytest_cache/
 .mypy_cache/
 server_output.log
+_archive/
+logs/
+_p7_probe.py
+tmp_douyin_login.py

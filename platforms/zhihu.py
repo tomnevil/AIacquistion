@@ -21,14 +21,10 @@ class ZhihuPlatform(BaseSocialPlatform):
     async def login(self) -> bool:
         try:
             await self._navigate_and_wait(self.base_url)
+            await browser_engine.human_delay(2, 4)  # 等待页面加载完成
 
-            if self.account.get("cookies_json"):
-                import json
-                cookies = json.loads(self.account["cookies_json"])
-                await self.page.context.add_cookies(cookies)
-                await self.page.reload()
-                await browser_engine.human_delay(2, 4)
-
+            # 不注入 DB cookies_json —— persistent profile 已含完整登录态，
+            # 注入过期快照会覆盖 profile 中已轮换的新 session，导致掉线
             if await self._is_logged_in():
                 return True
 
@@ -527,28 +523,156 @@ class ZhihuPlatform(BaseSocialPlatform):
             return {"success": False, "error": str(e)}
 
     async def publish_content(self, title: str, content: str, images: list[str] = None) -> dict:
-        """知乎写回答 — 需要先定位到目标问题"""
+        """知乎写文章 — 打开创作中心，进入编辑器，填写并发布"""
         try:
-            await self._navigate_and_wait(f"{self.base_url}/creator")
+            # 1. 直接打开知乎文章编辑器（zhuanlan.zhihu.com 与 www 共享登录态，
+            #    避免创作中心"写文章"入口 + 新标签页切换的不确定性）
+            use_page = self.page
+            await self._navigate_and_wait("https://zhuanlan.zhihu.com/write")
+            await browser_engine.human_delay(3, 5)
+
+            # 1.5 登录态失效会被重定向到登录页
+            if "/signin" in use_page.url:
+                await self._debug_screenshot("publish_need_login")
+                return {"success": False, "error": "编辑器跳转登录页，登录态已失效"}
+
+            # [P7调试] 编辑器页截图（用后删除）
+            try:
+                import time as _t
+                _dbg = browser_engine.BROWSER_DATA_DIR / f"account_{self.account_id}" / f"debug_editor_{int(_t.time())}.png"
+                await use_page.screenshot(path=str(_dbg))
+                print(f"[Zhihu] [调试] 编辑器截图: {_dbg.name}, url={use_page.url[:80]}")
+            except Exception as _e:
+                print(f"[Zhihu] [调试] 截图失败: {_e}")
+
+            # 1.8 关闭可能的首发引导弹层（首次写文章会弹"填写专栏信息"等）
+            try:
+                close_btn = use_page.locator(
+                    ".Modal-closeButton, button[aria-label='关闭'], button[aria-label='Close']"
+                ).first
+                if await close_btn.count() > 0 and await close_btn.is_visible():
+                    await browser_engine.human_click(use_page, close_btn)
+                    await browser_engine.human_delay(1, 2)
+            except Exception:
+                pass
+
+            # 4. 填标题（知乎编辑器标题框真实选择器）
+            title_input = None
+            title_selectors = [
+                "textarea[placeholder='标题']",
+                "textarea[placeholder*='标题']",
+                ".css-1ta9b1n",
+                "textarea.Editor-title",
+                "div[class*='title'] textarea",
+            ]
+            for sel in title_selectors:
+                loc = use_page.locator(sel)
+                if await loc.count() > 0:
+                    title_input = loc.first
+                    break
+
+            if not title_input:
+                await self._debug_screenshot("publish_no_title")
+                return {"success": False, "error": "未找到标题输入框"}
+
+            try:
+                await title_input.click(timeout=10000)
+            except Exception:
+                # 兜底：Playwright 判定不可点击时用 JS 聚焦
+                await use_page.evaluate(
+                    "() => { const el = document.querySelector(\"textarea[placeholder='标题'], textarea[placeholder*='标题']\"); if (el) { el.focus(); el.click(); } }"
+                )
+            await browser_engine.human_type(use_page, title_input, title)
+            await browser_engine.human_delay(1, 2)
+
+            # 5. 填正文（contenteditable 编辑器）
+            content_area = None
+            content_selectors = [
+                "div.public-DraftEditor-content[contenteditable='true']",
+                "div[contenteditable='true']",
+                ".notranslate.public-DraftEditor-content",
+                "div.ql-editor",
+            ]
+            for sel in content_selectors:
+                loc = use_page.locator(sel)
+                if await loc.count() > 0:
+                    content_area = loc.first
+                    break
+
+            if not content_area:
+                await self._debug_screenshot("publish_no_content")
+                return {"success": False, "error": "未找到正文编辑器"}
+
+            await content_area.click()
+            await browser_engine.human_type(use_page, content_area, content)
             await browser_engine.human_delay(2, 4)
 
-            # 写文章入口
-            write_btn = self.page.locator("a:has-text('写文章'), button:has-text('写文章')")
-            if await write_btn.count() > 0:
-                await write_btn.first.click()
-                await browser_engine.human_delay(2, 4)
+            # 6. 点击"发布"按钮（多选择器兜底 + JS 兜底）
+            publish_btn = None
+            publish_selectors = [
+                "button:has-text('发布')",
+                "button:has-text('发表')",
+                "button[class*='publish']",
+                "button:has-text('确定')",
+            ]
+            for sel in publish_selectors:
+                loc = use_page.locator(sel)
+                cnt = await loc.count()
+                if cnt > 0:
+                    for i in range(cnt):
+                        btn = loc.nth(i)
+                        try:
+                            if await btn.is_visible() and await btn.is_enabled():
+                                publish_btn = btn
+                                break
+                        except Exception:
+                            continue
+                    if publish_btn:
+                        break
 
-                title_input = self.page.locator("textarea[placeholder*='标题']").first
-                await browser_engine.human_type(self.page, title_input, title)
+            if not publish_btn:
+                found = await use_page.evaluate("""() => {
+                    const btns = Array.from(document.querySelectorAll('button'));
+                    const p = btns.find(b => {
+                        const t = (b.innerText || '').trim();
+                        return t === '发布' || t === '发表';
+                    });
+                    if (p) { p.click(); return true; }
+                    return false;
+                }""")
+                if not found:
+                    await self._debug_screenshot("publish_no_submit")
+                    return {"success": False, "error": "未找到发布按钮"}
 
-                content_area = self.page.locator("div[contenteditable='true']").first
-                await browser_engine.human_type(self.page, content_area, content)
+            if publish_btn:
+                await browser_engine.human_click(use_page, publish_btn)
 
-                await browser_engine.human_delay(3, 5)
-                return {"success": True}
+            await browser_engine.human_delay(4, 6)
 
-            return {"success": False, "error": "创作入口未找到"}
+            # 7. 处理可能的二次确认弹窗
+            confirm_btn = use_page.locator("button:has-text('确定'), button:has-text('确认发布'), button:has-text('确认')").first
+            if await confirm_btn.count() > 0:
+                try:
+                    if await confirm_btn.is_visible():
+                        await browser_engine.human_click(use_page, confirm_btn)
+                        await browser_engine.human_delay(3, 5)
+                except Exception:
+                    pass
+
+            # 记录文章页 URL — 发布后停留在编辑器（/p/xxx/edit），
+            # 去掉 /edit 后缀得到文章页，供效果回采直接访问
+            publish_url = use_page.url
+            if publish_url.rstrip("/").endswith("/edit"):
+                publish_url = publish_url.rstrip("/")[: -len("/edit")]
+
+            return {
+                "success": True,
+                "url": publish_url,
+                "title": title[:50],
+            }
+
         except Exception as e:
+            await self._debug_screenshot("publish_exception")
             return {"success": False, "error": str(e)}
 
     async def get_my_comments(self, content_url: str) -> list[dict]:
@@ -887,32 +1011,110 @@ class ZhihuPlatform(BaseSocialPlatform):
 
     async def get_account_stats(self) -> dict:
         try:
+            await self._navigate_and_wait(self.base_url)
+            await browser_engine.human_delay(2, 4)
+
+            # 优先：登录态内部 API（同源 fetch 携带 cookie，结构化数据最可靠）
+            data = await self.page.evaluate(
+                "fetch('/api/v4/me', {credentials: 'include'}).then(r => r.json()).catch(() => null)"
+            )
+            if isinstance(data, dict) and data.get("id"):
+                return {
+                    "follower_count": int(data.get("follower_count") or 0),
+                    "content_count": int(data.get("articles_count") or 0)
+                    + int(data.get("answer_count") or 0),
+                    "works": [],
+                    "url_token": data.get("url_token", ""),
+                }
+
+            # 回退：创作中心 DOM 解析（支持"1.2万"格式）
             await self._navigate_and_wait(f"{self.base_url}/creator")
             await browser_engine.human_delay(3, 5)
 
+            import re
+
+            def _cn_num(text: str) -> int:
+                m = re.search(r'([\d.]+)\s*(万|亿)?', text or "")
+                if not m:
+                    return 0
+                val = float(m.group(1))
+                if m.group(2) == "万":
+                    val *= 10000
+                elif m.group(2) == "亿":
+                    val *= 100000000
+                return int(val)
+
             follower_count = 0
             content_count = 0
-            works = []
-
             stats_selector = "[class*='stat'], [class*='count'], .ProfileStats"
             els = self.page.locator(stats_selector)
             count = await els.count()
             for i in range(min(count, 10)):
                 text = await els.nth(i).text_content()
                 if text:
-                    import re
-                    nums = re.findall(r'(\d+)', text)
-                    if nums:
-                        if '关注者' in text or '粉丝' in text:
-                            follower_count = int(nums[0])
-                        elif '回答' in text or '文章' in text or '内容' in text:
-                            content_count = int(nums[0])
+                    if "关注者" in text or "粉丝" in text:
+                        follower_count = max(follower_count, _cn_num(text))
+                    elif "回答" in text or "文章" in text or "内容" in text:
+                        content_count = max(content_count, _cn_num(text))
 
             return {
                 "follower_count": follower_count,
                 "content_count": content_count,
-                "works": works,
+                "works": [],
             }
         except Exception as e:
             print(f"[Zhihu] 获取账号统计失败: {e}")
             return {"follower_count": 0, "content_count": 0, "works": []}
+
+    async def get_post_metrics(self, post_url: str) -> dict:
+        """回采单篇文章效果 — 文章页公开数据（赞同/评论）
+
+        阅读数仅知乎创作中心后台可见，公开页不含该数据，views 固定 0；
+        DOM 结构取自文章页 action bar（VoteButton + 评论按钮），解析失败返回 None 触发下轮重试。
+        """
+        if not post_url:
+            return None
+        try:
+            await self._navigate_and_wait(post_url)
+            await browser_engine.human_delay(2, 4)
+
+            data = await self.page.evaluate(
+                """
+() => {
+    const num = (s) => {
+        const m = (s || '').replace(/,/g, '').match(/(\\d+)/);
+        return m ? parseInt(m[1], 10) : 0;
+    };
+    // 赞同按钮（"赞同 123"/"赞同"/"已赞同 123"）
+    let likes = 0;
+    const voteEl = document.querySelector('.VoteButton--up')
+        || document.querySelector('button[data-za-detail-view-element_name__MainVoteButton]');
+    if (voteEl) {
+        const t = (voteEl.textContent || '').trim();
+        const m = t.replace(/,/g, '').match(/(\\d+)/);
+        likes = m ? parseInt(m[1], 10) : 0;
+    }
+    // 评论按钮（"12 条评论"/"添加评论"）
+    let comments = 0;
+    const actionBtns = document.querySelectorAll('.ContentItem-actions button, .ContentItem-actions a, .ContentItem-actions [role="button"]');
+    for (const b of actionBtns) {
+        const t = (b.textContent || '').trim();
+        const m = t.replace(/,/g, '').match(/(\\d+)\\s*条评论/);
+        if (m) { comments = parseInt(m[1], 10); break; }
+    }
+    return { likes, comments, shares: 0, bookmarks: 0, views: 0 };
+}
+"""
+            )
+            if not isinstance(data, dict):
+                return None
+            return {
+                "views": int(data.get("views") or 0),
+                "likes": int(data.get("likes") or 0),
+                "comments": int(data.get("comments") or 0),
+                "shares": int(data.get("shares") or 0),
+                "bookmarks": int(data.get("bookmarks") or 0),
+            }
+        except Exception as e:
+            print(f"[Zhihu] 回采文章数据失败: {e}")
+            return None

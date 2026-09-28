@@ -1,0 +1,21 @@
+[Unit]
+Description=AI Acquisition System (Tencent Lighthouse)
+After=network.target
+
+[Service]
+Type=simple
+User=__SERVICE_USER__
+WorkingDirectory=__PROJECT_DIR__
+EnvironmentFile=__PROJECT_DIR__/.env
+# 使用虚拟环境 python, 避免污染系统包; Playwright 浏览器位于该用户 ~/.cache
+ExecStart=__PROJECT_DIR__/venv/bin/python main.py
+Restart=always
+RestartSec=5
+StandardOutput=append:__PROJECT_DIR__/logs/server.log
+StandardError=append:__PROJECT_DIR__/logs/error.log
+
+# 防止日志文件过大
+LogRateLimitIntervalSec=0
+
+[Install]
+WantedBy=multi-user.target

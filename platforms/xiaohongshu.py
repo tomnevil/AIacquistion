@@ -27,34 +27,89 @@ class XiaohongshuPlatform(BaseSocialPlatform):
     content_style = "真实体验感，像朋友分享，口语化，多用'姐妹们'/'真的'/'绝绝子'等小红书用语"
 
     async def login(self) -> bool:
-        """小红书登录 — 主要靠扫码，Cookie 恢复成功率低"""
+        """小红书登录 — creator 重定向检测登录态；未登录时首页扫码"""
+        creator_url = "https://creator.xiaohongshu.com"
         try:
-            await self._navigate_and_wait(self.base_url)
-
-            # 尝试 Cookie 恢复
-            if self.account.get("cookies_json"):
-                import json
-                cookies = json.loads(self.account["cookies_json"])
-                await self.page.context.add_cookies(cookies)
-                await self.page.reload()
-                await browser_engine.human_delay(2, 4)
-
-            if await self._is_logged_in():
-                print(f"[XHS] [OK] 登录成功: {self.account['account_name']}")
+            # 1. 可靠登录态检测：未登录时 creator 会重定向到 /login
+            await self._navigate_and_wait(creator_url)
+            await browser_engine.human_delay(2, 3)
+            if "/login" not in (self.page.url or ""):
+                print(f"[XHS] [OK] 登录态有效（创作者中心可访问）")
+                await browser_engine.save_cookies(self.account_id, self.page.context)
                 return True
+
+            # 2. 未登录 → 直接打开登录页（页面居中显示二维码，不依赖首页弹层）
+            await self._navigate_and_wait(self.login_url)
+            await browser_engine.human_delay(2, 4)
+            print(f"[XHS] 登录页URL: {self.page.url}")
+
+            # 后台模式无法扫码，立即返回（避免空等120秒阻塞巡检/统计同步）
+            if self.account.get("headless"):
+                print("[XHS] [!] 后台模式登录态失效，需人工扫码（跳过等待）")
+                return False
+
+            # 保存登录页截图，便于诊断二维码是否正常显示
+            try:
+                from datetime import datetime as _dt
+                debug_dir = browser_engine.BROWSER_DATA_DIR / f"account_{self.account_id}"
+                debug_dir.mkdir(exist_ok=True)
+                await self.page.screenshot(
+                    path=str(debug_dir / f"debug_login_{_dt.now().strftime('%Y%m%d_%H%M%S')}.png"),
+                )
+            except Exception:
+                pass
 
             print(f"[XHS] [!] 需要扫码登录，见浏览器窗口")
             print(f"[XHS] 请在手机上打开小红书扫码...")
 
-            for _ in range(LOGIN_WAIT_SECONDS):
+            # 3. 等待扫码：登录成功后页面会自动跳离 /login；二维码过期自动刷新
+            for i in range(LOGIN_WAIT_SECONDS):
                 await asyncio.sleep(1)
-                if await self._is_logged_in():
+                try:
+                    if "/login" not in (self.page.url or ""):
+                        await browser_engine.save_cookies(self.account_id, self.page.context)
+                        print("[XHS] [OK] 扫码登录成功")
+                        return True
+                except Exception:
+                    continue
+                if i % 30 == 29:  # 每30秒检查二维码是否过期
+                    try:
+                        refresh = self.page.locator("text=点击刷新").first
+                        if await refresh.count() > 0 and await refresh.is_visible():
+                            await browser_engine.human_click(self.page, refresh)
+                            print("[XHS] [!] 二维码已过期，自动刷新")
+                    except Exception:
+                        pass
+
+            # 4. 超时兜底：creator 再验一次（session 可能已建立但页面未刷新）
+            try:
+                await self._navigate_and_wait(creator_url)
+                if "/login" not in (self.page.url or ""):
                     await browser_engine.save_cookies(self.account_id, self.page.context)
+                    print("[XHS] [OK] 扫码登录成功（creator验证）")
                     return True
+            except Exception:
+                pass
 
             return False
         except Exception as e:
             print(f"[XHS] 登录失败: {e}")
+            return False
+
+    async def _page_logged_in_dom(self) -> bool:
+        """首页 DOM 轻量登录判定（不导航，可安全用于扫码等待循环）"""
+        try:
+            btns = self.page.locator("button:has-text('登录'), a:has-text('登录')")
+            n = await btns.count()
+            for i in range(min(n, 5)):
+                try:
+                    if await btns.nth(i).is_visible():
+                        return False
+                except Exception:
+                    continue
+            av = self.page.locator(".user-avatar, a[href*='/user/profile/'], [class*='avatar']")
+            return await av.count() > 0
+        except:
             return False
 
     async def post_comment(self, target_url: str, comment_text: str) -> dict:
@@ -220,26 +275,53 @@ class XiaohongshuPlatform(BaseSocialPlatform):
 
     async def get_account_stats(self) -> dict:
         try:
-            await self._navigate_and_wait(f"{self.base_url}/settings/profile")
-            await browser_engine.human_delay(3, 5)
+            import re
+
+            def _cn_num(text: str) -> int:
+                """解析 '1.2万' / '3.5亿' / '1,234' 格式的数字"""
+                m = re.search(r'([\d,]+(?:\.\d+)?)\s*(万|亿)?', text or "")
+                if not m:
+                    return 0
+                try:
+                    val = float(m.group(1).replace(",", ""))
+                except ValueError:
+                    return 0
+                if m.group(2) == "万":
+                    val *= 10000
+                elif m.group(2) == "亿":
+                    val *= 100000000
+                return int(val)
 
             follower_count = 0
             content_count = 0
             works = []
 
-            stats_selector = "[class*='stat'], [class*='count'], .num"
-            els = self.page.locator(stats_selector)
-            count = await els.count()
-            for i in range(min(count, 10)):
-                text = await els.nth(i).text_content()
-                if text:
-                    import re
-                    nums = re.findall(r'(\d+)', text)
-                    if nums:
-                        if '粉丝' in text or '关注' in text:
-                            follower_count = int(nums[0])
-                        elif '笔记' in text or '内容' in text or '作品' in text:
-                            content_count = int(nums[0])
+            # 创作者中心首页（登录态下有"粉丝数/赞藏"等数据卡片）
+            await self._navigate_and_wait("https://creator.xiaohongshu.com")
+            await browser_engine.human_delay(3, 5)
+            print(f"[XHS] 统计页URL: {self.page.url}")
+            if "/login" in self.page.url:
+                print("[XHS] [!] 创作者中心未登录，需人工扫码")
+
+            body_text = ""
+            try:
+                body_text = await self.page.locator("body").inner_text()
+            except Exception:
+                body_text = ""
+
+            if body_text:
+                num = r'([\d,]+(?:\.\d+)?)\s*(万|亿)?'
+                m = (re.search(r'粉丝(?:总数|数|量)\s*[:：]?\s*' + num, body_text)
+                     or re.search(r'(?<!新增)粉丝\s*[:：]?\s*' + num, body_text))
+                if m:
+                    follower_count = _cn_num(m.group(0))
+
+                m = (re.search(r'(?:笔记数|笔记总数|笔记总量|累计笔记|发布笔记)\s*[:：]?\s*' + num, body_text)
+                     or re.search(r'(?<!新增)笔记\s*[:：]?\s*' + num, body_text))
+                if m:
+                    content_count = _cn_num(m.group(0))
+
+            print(f"[XHS] DOM解析: follower={follower_count} content={content_count} body_len={len(body_text)}")
 
             return {
                 "follower_count": follower_count,

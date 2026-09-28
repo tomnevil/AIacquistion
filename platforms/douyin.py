@@ -26,28 +26,50 @@ class DouyinPlatform(BaseSocialPlatform):
     content_style = "简短有力，口语化，可以带emoji，像弹幕风格"
 
     async def login(self) -> bool:
-        """抖音登录 — 扫码登录"""
+        """抖音登录 — 创作者中心重定向检测登录态（比首页DOM选择器可靠）"""
+        creator_url = "https://creator.douyin.com"
         try:
-            await self._navigate_and_wait(self.base_url)
-
-            if self.account.get("cookies_json"):
-                import json
-                cookies = json.loads(self.account["cookies_json"])
-                await self.page.context.add_cookies(cookies)
-                await self.page.reload()
-                await browser_engine.human_delay(2, 4)
-
-            if await self._is_logged_in():
+            # 1. 登录态检测：未登录时 creator.douyin.com 会重定向到登录页
+            await self._navigate_and_wait(creator_url)
+            await browser_engine.human_delay(2, 3)
+            cur = self.page.url
+            if "login" not in cur and "passport" not in cur:
+                print("[Douyin] [OK] 登录态有效（创作者中心可访问）")
+                await browser_engine.save_cookies(self.account_id, self.page.context)
                 return True
 
-            print(f"[Douyin] [!] 需要抖音APP扫码登录")
-            print(f"[Douyin] 请在浏览器窗口中用抖音扫码...")
+            # 2. 未登录 → 打开首页触发扫码
+            await self._navigate_and_wait(self.base_url)
+            await browser_engine.human_delay(2, 4)
 
+            # 后台模式无法扫码，立即返回（避免空等120秒阻塞巡检/统计同步）
+            if self.account.get("headless"):
+                print("[Douyin] [!] 后台模式登录态失效，需人工扫码（跳过等待）")
+                return False
+
+            print("[Douyin] [!] 需要抖音APP扫码登录")
+            print("[Douyin] 请在浏览器窗口中用抖音扫码...")
+
+            # 3. 等待扫码：轮询首页头像出现（不重新导航，避免打断二维码页面）
             for _ in range(LOGIN_WAIT_SECONDS):
                 await asyncio.sleep(1)
-                if await self._is_logged_in():
+                try:
+                    if await self.page.locator("[class*='avatar']").count() > 0:
+                        await browser_engine.save_cookies(self.account_id, self.page.context)
+                        print("[Douyin] [OK] 扫码登录成功")
+                        return True
+                except Exception:
+                    continue
+
+            # 4. 超时兜底：session 可能已建立但页面未刷新，用 creator 重定向再验一次
+            try:
+                await self._navigate_and_wait(creator_url)
+                if "login" not in self.page.url and "passport" not in self.page.url:
                     await browser_engine.save_cookies(self.account_id, self.page.context)
+                    print("[Douyin] [OK] 扫码登录成功（creator验证）")
                     return True
+            except Exception:
+                pass
 
             return False
         except Exception as e:
@@ -179,27 +201,66 @@ class DouyinPlatform(BaseSocialPlatform):
         return results
 
     async def get_account_stats(self) -> dict:
+        """获取账号统计数据 — 纯 DOM 解析
+
+        创作者中心数据接口有 X-Bogus 等签名校验，不能直接调用，
+        因此登录态下解析 creator.douyin.com 首页数据总览卡片，
+        失败则回退到个人主页（"1.2万 粉丝" 数字在前格式）。
+
+        Returns: {"follower_count": int, "content_count": int, "works": list}
+        """
         try:
-            await self._navigate_and_wait("https://creator.douyin.com")
-            await browser_engine.human_delay(3, 5)
+            import re
+
+            def _cn_num(text: str) -> int:
+                m = re.search(r'([\d.]+)\s*(万|亿)?', text or "")
+                if not m:
+                    return 0
+                val = float(m.group(1))
+                if m.group(2) == "万":
+                    val *= 10000
+                elif m.group(2) == "亿":
+                    val *= 100000000
+                return int(val)
 
             follower_count = 0
             content_count = 0
             works = []
 
-            stats_selector = "[class*='stat'], [class*='count'], .dashboard"
-            els = self.page.locator(stats_selector)
-            count = await els.count()
-            for i in range(min(count, 10)):
-                text = await els.nth(i).text_content()
-                if text:
-                    import re
-                    nums = re.findall(r'(\d+)', text)
-                    if nums:
-                        if '粉丝' in text or '关注' in text:
-                            follower_count = int(nums[0])
-                        elif '作品' in text or '视频' in text or '内容' in text:
-                            content_count = int(nums[0])
+            # 第一步：创作者中心首页数据总览卡片（类名为哈希，只能按文本匹配）
+            await self._navigate_and_wait("https://creator.douyin.com")
+            await browser_engine.human_delay(3, 5)
+            body_text = await self.page.evaluate(
+                "document.body ? document.body.innerText : ''") or ""
+
+            m = (re.search(r'粉丝总数[\s:：]*([\d.]+\s*[万亿]?)', body_text)
+                 or re.search(r'(?<!新增)粉丝数[\s:：]*([\d.]+\s*[万亿]?)', body_text))
+            if m:
+                follower_count = _cn_num(m.group(1))
+
+            m = (re.search(r'作品总数[\s:：]*([\d.]+\s*[万亿]?)', body_text)
+                 or re.search(r'作品数[\s:：]*([\d.]+\s*[万亿]?)', body_text))
+            if m:
+                content_count = _cn_num(m.group(1))
+
+            # 第二步：回退到个人主页（数字在前，无歧义："1.2万 粉丝 356 关注"）
+            if follower_count == 0 or content_count == 0:
+                try:
+                    await self._navigate_and_wait("https://www.douyin.com/user/self")
+                    await browser_engine.human_delay(3, 6)
+                    profile_text = await self.page.evaluate(
+                        "document.body ? document.body.innerText : ''") or ""
+
+                    if follower_count == 0:
+                        m = re.search(r'([\d.]+\s*[万亿]?)\s*粉丝', profile_text)
+                        if m:
+                            follower_count = _cn_num(m.group(1))
+                    if content_count == 0:
+                        m = re.search(r'作品\s*([\d.]+\s*[万亿]?)', profile_text)
+                        if m:
+                            content_count = _cn_num(m.group(1))
+                except Exception as e:
+                    print(f"[Douyin] 个人主页数据解析失败: {e}")
 
             return {
                 "follower_count": follower_count,

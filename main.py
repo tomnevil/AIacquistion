@@ -11,12 +11,13 @@ from utils.logger import setup_logging
 app_logger = setup_logging(settings.LOG_LEVEL if hasattr(settings, "LOG_LEVEL") else "INFO")
 
 # ⚠ 必须在创建事件循环之前设置策略
+# Windows 默认 ProactorEventLoop 支持 asyncio 子进程，Playwright 依赖它；
+# SelectorEventLoop 不支持子进程（_make_subprocess_transport 抛 NotImplementedError），
+# 因此这里必须显式使用 Proactor 策略。
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    # Python 3.13 ProactorEventLoop 不再支持 _make_subprocess_transport
-    # Playwright 需要子进程支持，使用 SelectorEventLoop
     try:
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
     except Exception:
         pass
 

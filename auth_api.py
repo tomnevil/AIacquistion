@@ -179,9 +179,8 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(403, "账号已被禁用")
 
-    if user.must_change_password:
-        raise HTTPException(403, "首次登录请先修改初始密码")
-
+    # 首次登录不阻断发 token（阻断会导致无 token 可改密而锁死），
+    # 由前端根据 must_change_password 标记强制完成改密后才可进入系统
     user.last_login_at = datetime.utcnow()
     db.commit()
 
@@ -194,6 +193,7 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     return {
         "access_token": token,
         "token_type": "bearer",
+        "must_change_password": bool(user.must_change_password),
         "user": _user_info(user, team_name),
     }
 

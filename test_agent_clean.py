@@ -1,11 +1,13 @@
 """P2-8 完整端到端验证（彻底清理 + 全四阶段产出验证）"""
-import requests, json
+import requests, json, os
 from datetime import datetime, timedelta
 
-BASE = "http://127.0.0.1:8000"
+BASE = os.environ.get("BASE_URL", "http://127.0.0.1:8001")
 
-# 登录
-r = requests.post(f"{BASE}/api/auth/login", json={"username": "admin", "password": "admin123"}, timeout=10)
+# 登录（密码从环境变量读取，不落盘）
+import os as _os
+_admin_pwd = _os.environ.get("ADMIN_PASSWORD", "")
+r = requests.post(f"{BASE}/api/auth/login", json={"username": "admin", "password": _admin_pwd}, timeout=10)
 H = {"Authorization": f"Bearer {r.json().get('access_token')}"}
 print(f"[0] 登录: {r.status_code}")
 
@@ -121,8 +123,8 @@ r = requests.post(f"{BASE}/api/agent/agents", headers=H, json=payload, timeout=1
 agent_id = r.json().get("data", {}).get("id")
 print(f"[3] 创建 Agent #{agent_id}: {r.status_code}")
 
-# ── 手动运行 ──
-r = requests.post(f"{BASE}/api/agent/agents/{agent_id}/run", headers=H, timeout=120)
+# ── 手动运行（同步模式：等待四阶段完成后返回 run 结果） ──
+r = requests.post(f"{BASE}/api/agent/agents/{agent_id}/run?background=false", headers=H, timeout=300)
 print(f"[4] 手动运行: {r.status_code} -> {r.json().get('message')}")
 run = (r.json().get("data") or {}).get("run") or {}
 run_id = run.get("id")
@@ -188,4 +190,4 @@ requests.put(f"{BASE}/api/agent/agents/{agent_id}", headers=H, json={"mode": "pa
 print(f"[cleanup] Agent #{agent_id} 已暂停")
 
 print("\n✅ P2-8 完整端到端验证完成（四阶段真实产出 + 审批回放）")
-print(f"   访问 http://127.0.0.1:8000/ 侧边栏「AI 运营 Agent」查看")
+print(f"   访问 http://127.0.0.1:8001/ 侧边栏「AI 运营 Agent」查看")

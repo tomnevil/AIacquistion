@@ -3872,11 +3872,54 @@ async function handleLogin(e) {
     currentUser = data.user;
     localStorage.setItem('auth_token', authToken);
     localStorage.setItem('current_user', JSON.stringify(currentUser));
+
+    // 首次登录/被重置密码：强制修改密码后才进入系统
+    if (data.must_change_password) {
+      const ok = await forceChangePassword();
+      if (!ok) {
+        authToken = ''; currentUser = null;
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('current_user');
+        document.getElementById('loginError').textContent = '必须完成首次改密后才能使用系统';
+        btn.disabled = false; btn.textContent = '登 录';
+        return;
+      }
+    }
     showApp();
   } catch (err) {
     document.getElementById('loginError').textContent = '网络错误，请检查后端服务';
     btn.disabled = false; btn.textContent = '登 录';
   }
+}
+
+// 首登强制改密：新密码需≥8位且含字母和数字，改密成功返回 true
+async function forceChangePassword() {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const oldPwd = document.getElementById('loginPassword').value;
+    const newPwd = prompt('首次登录：请设置新密码（至少8位，须包含字母和数字）');
+    if (newPwd === null) return false;
+    if (newPwd.length < 8 || !/[a-zA-Z]/.test(newPwd) || !/[0-9]/.test(newPwd)) {
+      alert('密码强度不足：至少8位，且同时包含字母和数字');
+      continue;
+    }
+    const confirmPwd = prompt('请再次输入新密码确认');
+    if (confirmPwd === null) return false;
+    if (newPwd !== confirmPwd) { alert('两次输入不一致，请重试'); continue; }
+    try {
+      const resp = await fetch(AUTH_API + '/password', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+        body: JSON.stringify({ old_password: oldPwd, new_password: newPwd }),
+      });
+      const rd = await resp.json();
+      if (!resp.ok) { alert(rd.detail || '改密失败，请重试'); continue; }
+      alert('密码修改成功，即将进入系统');
+      return true;
+    } catch (err) {
+      alert('网络错误，请重试');
+    }
+  }
+  return false;
 }
 
 // ── 注册 ──

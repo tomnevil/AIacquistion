@@ -29,14 +29,8 @@ class BilibiliPlatform(BaseSocialPlatform):
         try:
             await self._navigate_and_wait(self.base_url)
 
-            # 尝试 Cookie 恢复
-            if self.account.get("cookies_json"):
-                import json
-                cookies = json.loads(self.account["cookies_json"])
-                await self.page.context.add_cookies(cookies)
-                await self.page.reload()
-                await browser_engine.human_delay(2, 4)
-
+            # 不注入 DB cookies_json —— persistent profile 已含完整登录态，
+            # 注入过期快照会覆盖 profile 中已轮换的新 session，导致掉线
             if await self._is_logged_in():
                 print(f"[Bilibili] [OK] Cookie登录成功: {self.account['account_name']}")
                 return True

@@ -22,12 +22,8 @@ class WechatVideoPlatform(BaseSocialPlatform):
         try:
             await self._navigate_and_wait(self.login_url)
 
-            if self.account.get("cookies_json"):
-                cookies = json.loads(self.account["cookies_json"])
-                await self.page.context.add_cookies(cookies)
-                await self.page.reload()
-                await browser_engine.human_delay(2, 4)
-
+            # 不注入 DB cookies_json —— persistent profile 已含完整登录态，
+            # 注入过期快照会覆盖 profile 中已轮换的新 session，导致掉线
             if await self._is_logged_in():
                 return True
 
@@ -103,28 +99,104 @@ class WechatVideoPlatform(BaseSocialPlatform):
             await self._navigate_and_wait(f"{self.base_url}/platform")
             await browser_engine.human_delay(3, 5)
 
-            follower_count = 0
-            content_count = 0
-            works = []
+            import re
 
-            stats_selector = ".stats, [class*='stat'], [class*='count'], .dashboard"
-            els = self.page.locator(stats_selector)
-            count = await els.count()
-            for i in range(min(count, 10)):
-                text = await els.nth(i).text_content()
-                if text:
-                    import re
-                    nums = re.findall(r'(\d+)', text)
-                    if nums:
-                        if '粉丝' in text or '关注' in text:
-                            follower_count = int(nums[0])
-                        elif '视频' in text or '内容' in text or '作品' in text:
-                            content_count = int(nums[0])
+            def _cn_num(text: str) -> int:
+                m = re.search(r'(\d+(?:\.\d+)?)\s*(万|亿)?', (text or "").replace(",", "").replace("，", ""))
+                if not m:
+                    return 0
+                val = float(m.group(1))
+                if m.group(2) == "万":
+                    val *= 10000
+                elif m.group(2) == "亿":
+                    val *= 100000000
+                return int(val)
+
+            # 代码库内无已验证的内部 API 端点，不做臆测；采用纯 DOM 解析：
+            # 主路径为页面文本树"标签-数值"就近匹配（创作者中心含"粉丝"等数据）
+            stats_js = r"""
+                () => {
+                  const parseNum = (s) => {
+                    if (s == null) return null;
+                    const m = String(s).replace(/[,，\s]/g, "").match(/(\d+(?:\.\d+)?)(万|亿)?/);
+                    if (!m) return null;
+                    let v = parseFloat(m[1]);
+                    if (isNaN(v)) return null;
+                    if (m[2] === "万") v *= 10000;
+                    else if (m[2] === "亿") v *= 100000000;
+                    v = Math.round(v);
+                    return v > 0 ? v : null;
+                  };
+                  const findByKeywords = (kwRegex) => {
+                    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+                    let best = null;
+                    let bestDepth = Infinity;
+                    let node;
+                    while ((node = walker.nextNode())) {
+                      const t = node.textContent || "";
+                      if (!t || !kwRegex.test(t)) continue;
+                      const pe = node.parentElement;
+                      if (!pe) continue;
+                      const tag = pe.tagName ? pe.tagName.toLowerCase() : "";
+                      if (tag === "script" || tag === "style" || tag === "noscript") continue;
+                      if (pe.offsetWidth === 0 && pe.offsetHeight === 0) continue;
+                      let el = pe;
+                      let depth = 0;
+                      while (el && el !== document.body && depth < 8) {
+                        const n = parseNum(el.textContent);
+                        if (n !== null) {
+                          if (best === null || depth < bestDepth || (depth === bestDepth && n > best)) {
+                            best = n;
+                            bestDepth = depth;
+                          }
+                          break;
+                        }
+                        el = el.parentElement;
+                        depth++;
+                      }
+                    }
+                    return best;
+                  };
+                  return {
+                    follower: findByKeywords(/粉丝/),
+                    content: findByKeywords(/作品|视频|内容/)
+                  };
+                }
+            """
+
+            # 视频号为 SPA，首屏可能未渲染完，做一次重试
+            stats = None
+            for attempt in range(2):
+                try:
+                    stats = await self.page.evaluate(stats_js)
+                except Exception:
+                    stats = None
+                if stats and (stats.get("follower") or stats.get("content")):
+                    break
+                if attempt == 0:
+                    await browser_engine.human_delay(3, 5)
+
+            follower_count = int((stats or {}).get("follower") or 0)
+            content_count = int((stats or {}).get("content") or 0)
+
+            # 回退：DOM 定位器扫描（支持"1.2万/3.5亿"换算）
+            if follower_count == 0 or content_count == 0:
+                stats_selector = ".stats, [class*='stat'], [class*='count'], .dashboard"
+                els = self.page.locator(stats_selector)
+                count = await els.count()
+                for i in range(min(count, 15)):
+                    text = await els.nth(i).text_content()
+                    if not text:
+                        continue
+                    if follower_count == 0 and ("粉丝" in text or "关注" in text):
+                        follower_count = max(follower_count, _cn_num(text))
+                    elif content_count == 0 and ("作品" in text or "视频" in text or "内容" in text):
+                        content_count = max(content_count, _cn_num(text))
 
             return {
                 "follower_count": follower_count,
                 "content_count": content_count,
-                "works": works,
+                "works": [],
             }
         except Exception as e:
             print(f"[Wechat Video] 获取账号统计失败: {e}")
