@@ -28,3 +28,5 @@ _archive/
 logs/
 _p7_probe.py
 tmp_douyin_login.py
+static/*.backup*
+static/*.final_backup
