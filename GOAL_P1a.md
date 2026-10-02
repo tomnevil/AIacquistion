@@ -40,12 +40,12 @@
   - 在微调区（`publishRefineInput` 附近）加"↩ 撤销微调"按钮，栈空时 `disabled`
 
 **完成判据**：
-- [ ] `PublishContentRefineRequest` 含 `selection: str = ""` 字段
-- [ ] `refine_publish_content` 当 `selection` 非空时，prompt 含"仅改写选中段落"语义（其余原样照抄）
-- [ ] `doPublishRefine` 检测 Quill 选区并发送 `selection`（无选区时走原逻辑）
-- [ ] `_publishRefineStack` 与 `undoPublishRefine` 存在；撤销按钮存在且栈空时禁用
-- [ ] 无选区时行为与原来完全一致（整篇微调不回归）
-- [ ] `grep` 确认：platform_api.py 有 `selection`；index.html 有 `getSelection`
+- [x] `PublishContentRefineRequest` 含 `selection: str = ""` 字段
+- [x] `refine_publish_content` 当 `selection` 非空时，prompt 含"仅改写选中段落"语义（其余原样照抄）
+- [x] `doPublishRefine` 检测 Quill 选区并发送 `selection`（无选区时走原逻辑）
+- [x] `_publishRefineStack` 与 `undoPublishRefine` 存在；撤销按钮存在且栈空时禁用
+- [x] 无选区时行为与原来完全一致（整篇微调不回归）
+- [x] `grep` 确认：platform_api.py 有 `selection`；index.html 有 `getSelection`
 
 ---
 

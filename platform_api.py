@@ -747,6 +747,7 @@ class PublishContentRefineRequest(BaseModel):
     content: str
     instruction: str
     platform: str = ""
+    selection: str = ""  # 选区微调：仅改写该段，其余原样照抄；为空则整篇微调
 
 
 @router.post("/accounts/{account_id}/publish/refine")
@@ -768,6 +769,16 @@ async def refine_publish_content(
     style = PLATFORM_STYLES.get(acc.platform, PLATFORM_STYLES.get("weibo", {}))
     persona_text = acc.persona or "普通用户"
 
+    # 选区微调：仅改写选中段落，其余部分原样照抄
+    selection = (req.selection or "").strip()
+    is_selection = bool(selection)
+    selection_rule = (
+        "5. 本次为【选区微调】：只改写用户选中的那一段文本，输出中用改写后的版本替换它；"
+        "正文其余部分必须逐字原样照抄，不得改写、不得删减、不得调整顺序"
+        if is_selection else
+        "5. 本次为整篇微调：通读全文后按指令改写"
+    )
+
     system = f"""你是一个专业的内容编辑，负责按用户指令对已有内容做二次修改。
 
 账号信息:
@@ -779,9 +790,23 @@ async def refine_publish_content(
 1. 严格按用户修改指令改写，指令涉及的部分必须调整
 2. 未被指令涉及的部分保持原意，不要无脑重写
 3. 保留原文的结构化排版标记（## 标题、**加粗**、- 列表、> 引用）；若指令要求调整排版则按要求
-4. 只输出改写后的完整内容本身，不要输出说明文字或 diff"""
+4. 只输出改写后的完整内容本身，不要输出说明文字或 diff
+{selection_rule}"""
 
-    user = f"""【原文】
+    if is_selection:
+        user = f"""【原文】
+{req.content}
+
+【选中段落】（仅改写这一段，其余原样照抄）
+{selection}
+
+【修改指令】
+{req.instruction}
+
+要求：仅改写【选中段落】文本，将其替换为改写后版本，正文其余部分原样照抄返回。
+请输出改写后的完整内容:"""
+    else:
+        user = f"""【原文】
 {req.content}
 
 【修改指令】

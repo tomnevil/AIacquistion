@@ -2492,6 +2492,7 @@ a:hover { text-decoration:underline; }
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <input type="text" id="publishRefineInput" placeholder="例：开头更犀利 / 第二段加一个真实案例 / 结尾加行动号召 / 整体压缩到 800 字 / 语气更像朋友聊天" style="flex:1;min-width:260px;padding:9px 12px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:13px" onkeydown="if(event.key==='Enter'){doPublishRefine();}">
           <button class="btn" onclick="doPublishRefine()" id="btnPublishRefine" style="background:var(--purple-gradient);color:#fff;border:none;padding:8px 20px;font-weight:700;border-radius:var(--radius-sm);cursor:pointer;white-space:nowrap">✨ AI 微调</button>
+          <button class="quick-act-btn" onclick="undoPublishRefine()" id="btnUndoRefine" disabled title="撤销上一次 AI 微调（栈空时不可用）" style="opacity:.45;cursor:not-allowed">↩ 撤销微调</button>
           <button class="quick-act-btn" onclick="autoIllustrate()" id="btnAutoIllustrate" title="按小节自动插入配图（示例占位图）">🖼 自动配图</button>
         </div>
         <div style="font-size:11px;color:var(--text2);margin-top:6px">💡 自动配图为示例占位图；正式发布到公众号前，建议替换为真实图片（可在编辑器中点击图片删除/替换）。</div>
@@ -4959,7 +4960,33 @@ async function doGenerateOutline(){
   if (btn){ btn.disabled = false; btn.textContent = '✨ AI 生成大纲'; }
 }
 
-// ── AI 二次微调 ──
+// ── AI 二次微调（支持选区微调 + 撤销） ──
+var _publishRefineStack = [];
+
+function updateRefineUndoBtn(){
+  var b = document.getElementById('btnUndoRefine');
+  if (!b) return;
+  var empty = _publishRefineStack.length === 0;
+  b.disabled = empty;
+  b.style.opacity = empty ? '.45' : '1';
+  b.style.cursor = empty ? 'not-allowed' : 'pointer';
+  b.title = empty ? '暂无可撤销的 AI 微调' : ('撤销上一次 AI 微调（可撤销 ' + _publishRefineStack.length + ' 步）');
+}
+
+function undoPublishRefine(){
+  if (!_publishEditor) return toast('编辑器未就绪', 'error');
+  if (_publishRefineStack.length === 0) { updateRefineUndoBtn(); return toast('没有可撤销的微调', 'info'); }
+  var html = _publishRefineStack.pop();
+  try {
+    _publishEditor.root.innerHTML = html;
+  } catch(e){
+    return toast('撤销失败', 'error');
+  }
+  updatePublishCharCount();
+  updateRefineUndoBtn();
+  toast('已撤销上一次 AI 微调', 'success');
+}
+
 async function doPublishRefine(){
   if (!_publishAccountId) return toast('请先在左侧选择账号', 'error');
   var inst = (document.getElementById('publishRefineInput')?.value || '').trim();
@@ -4967,18 +4994,33 @@ async function doPublishRefine(){
   if (!_publishEditor) return toast('编辑器未就绪', 'error');
   var content = _publishEditor.getText().trim();
   if (!content) return toast('当前没有可微调的内容，请先选择候选或生成内容', 'error');
+
+  // 选区微调：有选中文本时只改写该段，其余原样照抄
+  var selection = '';
+  try {
+    var range = _publishEditor.getSelection();
+    if (range && range.length > 0){
+      selection = (_publishEditor.getText(range.index, range.length) || '').trim();
+    }
+  } catch(e){ selection = ''; }
+
   var btn = document.getElementById('btnPublishRefine');
-  if (btn){ btn.disabled = true; btn.textContent = 'AI 微调中...'; }
+  if (btn){ btn.disabled = true; btn.textContent = selection ? 'AI 选区微调中...' : 'AI 微调中...'; }
   try {
     var res = await apiFetch(PAPI+'/accounts/'+_publishAccountId+'/publish/refine', {method:'POST', body:JSON.stringify({
       content: content,
-      instruction: inst
+      instruction: inst,
+      selection: selection
     })});
     if (res.success && res.content){
+      // 改写前压栈，供撤销恢复
+      _publishRefineStack.push(_publishEditor.root.innerHTML);
+      if (_publishRefineStack.length > 20) _publishRefineStack.shift();
       _publishEditor.root.innerHTML = mdToQuillHtml(res.content);
       updatePublishCharCount();
+      updateRefineUndoBtn();
       document.getElementById('publishRefineInput').value = '';
-      toast('微调完成，可继续输入指令再次微调', 'success');
+      toast(selection ? ('选区微调完成（选中 ' + selection.length + ' 字，其余保持原样）') : '微调完成，可继续输入指令再次微调', 'success');
     } else {
       toast(res.error || '微调失败', 'error');
     }
@@ -5101,7 +5143,9 @@ function clearPublishEditor(){
   if (!_publishEditor) return;
   if (confirm('确定清空编辑器内容吗？')) {
     _publishEditor.root.innerHTML = '';
+    _publishRefineStack = [];
     updatePublishCharCount();
+    updateRefineUndoBtn();
     toast('编辑器已清空', 'info');
   }
 }
