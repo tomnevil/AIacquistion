@@ -2464,12 +2464,15 @@ a:hover { text-decoration:underline; }
             </select>
           </div>
           <div class="pa-field" style="flex:1 1 100%">
-            <label>🧭 文章大纲（AI 生成 / 手动编辑，每行一小节）</label>
+            <label>🧭 文章大纲（AI 生成 / 手动编辑，可增删改排序）</label>
             <div style="display:flex;gap:8px;margin-bottom:6px;align-items:center">
               <button class="btn btn-outline btn-sm" onclick="doGenerateOutline()" id="btnGenOutline" style="font-size:12px;padding:6px 14px">✨ AI 生成大纲</button>
-              <span style="font-size:11px;color:var(--text2)">先生成大纲 → 可手动增删改 → 再点「AI 生成内容」，正文将严格按大纲展开</span>
+              <span style="font-size:11px;color:var(--text2)">先生成大纲 → 可手动增删改/排序 → 再点「AI 生成内容」，正文将严格按大纲展开</span>
             </div>
-            <textarea id="publishOutline" rows="6" placeholder="每行一小节，例如：&#10;01 钩子开头：用一个反常识案例引入&#10;02 核心观点：讲清楚为什么&#10;03 案例：真实数据支撑&#10;04 总结与行动引导" style="width:100%;padding:10px 12px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:13px;line-height:1.7;font-family:inherit;resize:vertical"></textarea>
+            <!-- 隐藏的数据载体：卡片列表序列化后写回这里，后端 outline 字段格式不变 -->
+            <textarea id="publishOutline" rows="6" placeholder="每行一小节，例如：&#10;01 钩子开头：用一个反常识案例引入&#10;02 核心观点：讲清楚为什么&#10;03 案例：真实数据支撑&#10;04 总结与行动引导" style="display:none;width:100%;padding:10px 12px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:13px;line-height:1.7;font-family:inherit;resize:vertical"></textarea>
+            <div id="publishOutlineCards" style="display:flex;flex-direction:column;gap:8px"></div>
+            <button class="btn btn-outline btn-sm" onclick="addOutlineSection()" style="margin-top:8px;font-size:12px;padding:6px 14px">➕ 添加小节</button>
           </div>
           <div class="pa-field" style="flex:1 1 100%">
             <label>🖊️ 自定义提示词（对 AI 的额外要求，可与上面选项叠加）</label>
@@ -4951,6 +4954,117 @@ function getPublishPayload(){
   return { content: content, images: images, cover_image: _publishCoverUrl || '' };
 }
 
+// ── 文章大纲结构化卡片（textarea 作为隐藏数据载体，格式前缀兼容） ──
+var _publishOutlineSections = [];
+
+function outlineNum(i){
+  return (i + 1 < 10 ? '0' : '') + (i + 1);
+}
+
+// 卡片 → textarea：`01 {section}：{points}｜本节提示：{hint}`
+function syncOutlineToTextarea(){
+  var ta = document.getElementById('publishOutline');
+  if (!ta) return;
+  ta.value = _publishOutlineSections.map(function(s, i){
+    var line = outlineNum(i) + ' ' + (s.section || '') + (s.points ? '：' + s.points : '');
+    if (s.hint) line += '｜本节提示：' + s.hint;
+    return line;
+  }).join('\n');
+}
+
+// textarea → 卡片（兼容手工/历史文本，含 `｜本节提示：` 后缀）
+function parseOutlineFromTextarea(){
+  var ta = document.getElementById('publishOutline');
+  if (!ta || !ta.value || !ta.value.trim()) return [];
+  return ta.value.split('\n').map(function(l){
+    var t = l.trim();
+    if (!t) return null;
+    var hint = '';
+    var hi = t.indexOf('｜本节提示：');
+    if (hi >= 0){ hint = t.slice(hi + 6).trim(); t = t.slice(0, hi).trim(); }
+    t = t.replace(/^\d+\s*/, '');
+    var si = t.indexOf('：');
+    if (si >= 0) return {section: t.slice(0, si).trim(), points: t.slice(si + 1).trim(), hint: hint};
+    return {section: t, points: '', hint: hint};
+  }).filter(Boolean);
+}
+
+function renderOutlineCards(){
+  var box = document.getElementById('publishOutlineCards');
+  if (!box) return;
+  // 首次渲染且无结构化数据时，从隐藏 textarea 回填（兼容旧的手输大纲）
+  if (!_publishOutlineSections.length){
+    _publishOutlineSections = parseOutlineFromTextarea();
+    if (_publishOutlineSections.length) syncOutlineToTextarea();
+  }
+  if (!_publishOutlineSections.length){
+    box.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text2);font-size:12px;border:1.5px dashed rgba(148,163,184,0.3);border-radius:var(--radius-sm)">点「✨ AI 生成大纲」或「➕ 添加小节」开始</div>';
+    return;
+  }
+  var last = _publishOutlineSections.length - 1;
+  box.innerHTML = _publishOutlineSections.map(function(s, i){
+    var upDisabled = (i === 0);
+    var downDisabled = (i === last);
+    var btnStyle = 'border:1px solid rgba(148,163,184,0.3);background:#fff;border-radius:6px;cursor:pointer;font-size:12px;padding:2px 6px;line-height:1.4';
+    function actBtn(label, onclickAttr, disabled, title){
+      return '<button type="button" ' + (disabled ? 'disabled ' : '') + onclickAttr + ' title="' + title + '" style="' + btnStyle + (disabled ? ';opacity:.4;cursor:not-allowed' : '') + '">' + label + '</button>';
+    }
+    var field = function(fieldName, value, placeholder){
+      return '<input type="text" value="' + esc(value || '') + '" placeholder="' + placeholder + '" ' +
+        'onchange="updateOutlineField(' + i + ',\'' + fieldName + '\',this.value)" ' +
+        'style="width:100%;padding:6px 9px;border:1.5px solid rgba(148,163,184,0.25);border-radius:6px;font-size:12px;font-family:inherit;margin-bottom:4px">';
+    };
+    return '<div class="outline-card" style="padding:10px 12px;border:1.5px solid rgba(148,163,184,0.18);border-radius:var(--radius-sm);background:#fff">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+        '<span style="background:linear-gradient(135deg,#6366F1,#8B5CF6);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px">' + outlineNum(i) + '</span>' +
+        '<span style="font-size:11px;color:var(--text2)">小节标题 / 要点 / 本节提示词</span>' +
+        '<span style="margin-left:auto;display:flex;gap:4px">' +
+          actBtn('⬆', upDisabled ? '' : 'onclick="moveOutlineSection(' + i + ',-1)"', upDisabled, '上移') +
+          actBtn('⬇', downDisabled ? '' : 'onclick="moveOutlineSection(' + i + ',1)"', downDisabled, '下移') +
+          actBtn('🗑', 'onclick="removeOutlineSection(' + i + ')"', false, '删除本节') +
+        '</span>' +
+      '</div>' +
+      field('section', s.section, '小节标题，如：钩子开头') +
+      field('points', s.points, '要点（用、或逗号分隔），如：反常识案例、数据对比') +
+      field('hint', s.hint, '本节提示词（可选），如：本节必须引用艾瑞咨询2024数据') +
+    '</div>';
+  }).join('');
+}
+
+function updateOutlineField(i, field, value){
+  if (!_publishOutlineSections[i]) return;
+  _publishOutlineSections[i][field] = value;
+  syncOutlineToTextarea();
+}
+
+function addOutlineSection(){
+  _publishOutlineSections.push({section: '', points: '', hint: ''});
+  renderOutlineCards();
+  syncOutlineToTextarea();
+  var box = document.getElementById('publishOutlineCards');
+  if (box){
+    var inputs = box.querySelectorAll('input[type="text"]');
+    if (inputs.length) inputs[inputs.length - 3].focus();
+  }
+}
+
+function moveOutlineSection(i, dir){
+  var j = i + dir;
+  if (j < 0 || j >= _publishOutlineSections.length) return;
+  var tmp = _publishOutlineSections[i];
+  _publishOutlineSections[i] = _publishOutlineSections[j];
+  _publishOutlineSections[j] = tmp;
+  renderOutlineCards();
+  syncOutlineToTextarea();
+}
+
+function removeOutlineSection(i){
+  if (i < 0 || i >= _publishOutlineSections.length) return;
+  _publishOutlineSections.splice(i, 1);
+  renderOutlineCards();
+  syncOutlineToTextarea();
+}
+
 // ── AI 生成文章大纲 ──
 async function doGenerateOutline(){
   var topic = (document.getElementById('publishTopic')?.value || '').trim();
@@ -4965,13 +5079,16 @@ async function doGenerateOutline(){
     })});
     var outline = res.outline || [];
     if (!outline.length) throw new Error('大纲为空');
-    var lines = outline.map(function(o, i){
-      var num = (i + 1 < 10 ? '0' : '') + (i + 1);
-      return num + ' ' + (o.section || '') + (o.points && o.points.length ? '：' + o.points.join('、') : '');
+    _publishOutlineSections = outline.map(function(o){
+      return {
+        section: o.section || '',
+        points: (o.points && o.points.length) ? o.points.join('、') : '',
+        hint: ''
+      };
     });
-    var ta = document.getElementById('publishOutline');
-    if (ta) ta.value = lines.join('\n');
-    toast('大纲已生成（' + outline.length + ' 节），可手动修改后再生成正文', 'success');
+    renderOutlineCards();
+    syncOutlineToTextarea();
+    toast('大纲已生成（' + outline.length + ' 节），可增删改排序后再生成正文', 'success');
   } catch(e){ toast('大纲生成失败: ' + (e.message || ''), 'error'); }
   if (btn){ btn.disabled = false; btn.textContent = '✨ AI 生成大纲'; }
 }
@@ -7643,6 +7760,7 @@ function toggleAdvancedOptions() {
   if(body.style.display === 'none') {
     body.style.display = 'grid';
     if(arrow) arrow.textContent = '▾';
+    if (typeof renderOutlineCards === 'function') renderOutlineCards();
   } else {
     body.style.display = 'none';
     if(arrow) arrow.textContent = '▸';
