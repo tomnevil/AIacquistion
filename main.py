@@ -1,4 +1,5 @@
 """主应用入口"""
+import os
 import sys
 import asyncio
 import traceback
@@ -24,6 +25,7 @@ if sys.platform == "win32":
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from database import init_db
 from api import router as api_router
@@ -127,6 +129,10 @@ app.include_router(wecom_router)
 app.include_router(content_asset_router)
 app.include_router(agent_router)
 app.include_router(export_router)
+
+# 静态资源服务 — 上传的配图/封面图通过 /static/uploads/publish/<uuid>.<ext> 访问
+os.makedirs(os.path.join(settings.STATIC_DIR, "uploads", "publish"), exist_ok=True)
+app.mount("/static", StaticFiles(directory=settings.STATIC_DIR), name="static")
 
 
 @app.exception_handler(Exception)

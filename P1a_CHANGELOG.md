@@ -54,6 +54,65 @@
 
 ---
 
+---
+
 ## 任务 2：本地图片上传 + 封面图位
 
-**本轮未执行**（本轮 Goal 仅要求任务 1 判据全打勾 + 生成 changelog）。`GOAL_P1a.md` 中任务 2 的 9 条判据保持 `[ ]`，可独立再跑一轮。
+### `platform_api.py`
+
+| 位置 | 改动 | 判据 |
+|---|---|---|
+| 649 / 992 行 | `PublishContentExecuteRequest` 与 `PublishContentSubmitRequest` 各新增 `cover_image: str = ""` | 判据 7 |
+| 651-654 行 | 新增模块级常量 `ALLOWED_IMAGE_EXT = {"jpg","jpeg","png","webp","gif"}`、`MAX_IMAGE_SIZE = 5*1024*1024`、`PUBLISH_UPLOAD_DIRNAME = "uploads/publish"` | 判据 1、8 |
+| 657 行起 `POST /accounts/{account_id}/publish/upload-image` | 新增上传端点：账号归属校验 → 扩展名白名单校验 → 读取内容（空文件拒绝）→ 5MB 上限校验 → `uuid.uuid4().hex + "." + ext` 命名 → 写入 `os.path.join(settings.STATIC_DIR, "uploads", "publish")` → 返回 `{"success":true,"url":"/static/uploads/publish/<uuid>.<ext>","filename":...}` | 判据 1、2、8 |
+| 936 / 1024 行 | execute/submit 落库前改为 `images = ([req.cover_image] if req.cover_image else []) + list(req.images or [])`，再 `json.dumps` 写入 `task.images`（封面置首，不新增数据库列） | 判据 6、7 |
+| 3 / 9 行 | 新增 `import os`；`fastapi` 导入补充 `File, UploadFile` | 支撑 |
+
+安全要点：**文件名完全由 `uuid4().hex` 生成，用户原始文件名只用于取扩展名，不参与任何路径拼接**（防目录穿越）；类型白名单与 5MB 上限在写入磁盘前完成校验。
+
+### `main.py`
+
+| 位置 | 改动 | 判据 |
+|---|---|---|
+| 2 行 | 新增顶层 `import os` | 支撑 |
+| 26 行 | 新增 `from fastapi.staticfiles import StaticFiles` | 判据 3 |
+| 132-134 行（路由注册之后） | `os.makedirs(f"{settings.STATIC_DIR}/uploads/publish", exist_ok=True)` + `app.mount("/static", StaticFiles(directory=settings.STATIC_DIR), name="static")`；挂载路径 `/static` 与已有 `/` 页面路由不冲突 | 判据 3 |
+
+### `static/index.html`
+
+| 位置 | 改动 | 判据 |
+|---|---|---|
+| 微调按钮区（`btnAutoIllustrate` 旁） | 新增 `📷 上传图片` 按钮（点击触发隐藏 `<input type="file" id="publishImageFile" accept="image/jpeg,image/jpg,image/png,image/webp,image/gif">`） | 判据 4 |
+| 主题输入区下方 | 新增封面图位 `#publishCoverSlot`（默认"📷 点击设置封面图"，132×84 虚线框）+ 隐藏 `#publishCoverFile`，并附格式/大小说明 | 判据 5 |
+| 新增 JS 区块（"本地图片上传（配图 / 封面图）"） | `var _publishCoverUrl = null`；`PUBLISH_IMAGE_MAX_BYTES`/`PUBLISH_IMAGE_EXTS`；`checkPublishImageFile()`（前端预校验扩展名+5MB）；`uploadPublishImageToServer()`（FormData，复用 `apiFetch` 自动带 token）；`uploadPublishImage()`（上传后在 `getSelection().index` 处 `insertEmbed(pos,'image',url)`）；`uploadPublishCover()`（设置 `_publishCoverUrl` 并渲染）；`renderPublishCover()`（缩略图 + "点击更换" + ✕ 移除）；`clearPublishCover()` | 判据 4、5、8 |
+| `getPublishPayload()` | 返回值新增 `cover_image: _publishCoverUrl \|\| ''` | 判据 6 |
+| `doPublishExecute()` / `submitForReview()` | 取 `payload.cover_image`，请求体新增 `cover_image` | 判据 6 |
+| `clearPublishEditor()` | 清空编辑器时一并重置封面（`_publishCoverUrl = null; renderPublishCover();`），避免跨文档串封面 | 判据 5（健壮性） |
+| `autoIllustrate()` | **未改动**，picsum 占位配图仍可用 | 判据 9 |
+
+### 验证记录
+
+**后端（TestClient + 内存 SQLite，`/static` 挂载到临时 app）** — 11 项全 PASS：
+- 上传 `../../evil.png` → 返回 `url = /static/uploads/publish/4a4513f3bf3340679c37bd5493295d81.png`，**文件名不含 `evil`、不含 `..`**（判据 8）✅
+- 文件确实落盘到 `static/uploads/publish/` ✅
+- `GET <url>` → 200 / `image/png`（静态服务可用，判据 3）✅
+- `.txt` → 400「仅支持 gif/jpeg/jpg/png/webp 格式图片」；无扩展名 → 400；5MB+1 字节 → 400「图片不能超过 5MB」（判据 1）✅
+- 提交审核带 `cover_image` → `task.images = ["<封面>", "/static/uploads/publish/a.png"]`（封面置首）；不带封面 → `["/static/uploads/publish/a.png"]`（行为不变）✅
+- 两个请求模型 `cover_image` 默认为 `""` ✅
+- `import main` 后路由表含 `/static` 与 `/`（无冲突）✅
+
+**前端（Node + fake Quill/fake DOM，抽取上传区块与 `getPublishPayload` 源码执行）** — 10 项全 PASS：
+- 上传命中 `/api/platforms/accounts/1/publish/upload-image`，body 为 FormData（key=`file`）✅
+- 成功后 `insertEmbed(7,'image','/static/uploads/publish/….png')`（光标位置）✅
+- `.txt` → "仅支持 jpg/jpeg/png/webp/gif 图片"；6MB → "图片不能超过 5MB（当前 6MB）"（前端预校验）✅
+- 封面 slot 渲染出 `<img>` 缩略图；`payload.cover_image` 为封面 URL；`clearPublishCover()` 后 `cover_image === ""` ✅
+
+**静态检查**
+- `ast.parse`：`platform_api.py`、`main.py` 均通过 ✅
+- index.html 内联脚本 `node --check` 通过 ✅
+- `python -m pytest tests/ -q` → **33 passed** ✅
+- `grep -n "cover_image" platform_api.py` → 649、936、992、1024；`static/index.html` → 4774、4797、4951、7238、7250 ✅
+- `autoIllustrate()` / `picsum.photos` 仍在（5048、5068 行）✅
+
+> 说明：判据的"浏览器手测"在当前环境无可用浏览器，改用上述自动化探针覆盖同一路径（选择文件 → 上传 → 落盘/可访问 → 插入编辑器/封面预览 → 请求体带 cover_image → 封面置首落库）。
+> 探针脚本与其产生的 2 个测试图片已清理，`static/uploads/publish/` 为空目录保留。

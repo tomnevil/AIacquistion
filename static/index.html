@@ -2381,6 +2381,19 @@ a:hover { text-decoration:underline; }
         <button class="btn btn-lg" onclick="doPublishGenerate()" style="background:var(--purple-gradient);color:#fff;border:none;padding:10px 24px;font-size:14px;font-weight:700;border-radius:var(--radius-sm);box-shadow:0 4px 16px rgba(99,102,241,0.3);cursor:pointer;white-space:nowrap">🤖 AI 生成内容</button>
       </div>
 
+      <!-- 封面图位 -->
+      <div style="margin-top:12px;display:flex;gap:12px;align-items:flex-start">
+        <div id="publishCoverSlot" onclick="document.getElementById('publishCoverFile').click()" title="点击设置封面图（首图，决定打开率）" style="width:132px;height:84px;flex:none;border:1.5px dashed rgba(148,163,184,0.5);border-radius:var(--radius-sm);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);font-size:11px;background:rgba(148,163,184,0.06);overflow:hidden">
+          <span style="font-size:20px">📷</span>
+          <span>点击设置封面图</span>
+        </div>
+        <div style="font-size:11px;color:var(--text2);line-height:1.7;padding-top:6px">
+          封面图 = 发布后的首图（小红书/公众号打开率关键）。<br>
+          支持 jpg/jpeg/png/webp/gif，单张 ≤5MB；不设置则不发送封面。
+        </div>
+        <input type="file" id="publishCoverFile" accept="image/jpeg,image/jpg,image/png,image/webp,image/gif" style="display:none" onchange="uploadPublishCover(this)">
+      </div>
+
       <!-- 内容类型快捷选择 -->
       <div class="content-type-group" style="margin-top:12px">
         <div class="content-type-btn active" onclick="setContentType('article', this)">📝 图文文章</div>
@@ -2493,7 +2506,9 @@ a:hover { text-decoration:underline; }
           <input type="text" id="publishRefineInput" placeholder="例：开头更犀利 / 第二段加一个真实案例 / 结尾加行动号召 / 整体压缩到 800 字 / 语气更像朋友聊天" style="flex:1;min-width:260px;padding:9px 12px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:13px" onkeydown="if(event.key==='Enter'){doPublishRefine();}">
           <button class="btn" onclick="doPublishRefine()" id="btnPublishRefine" style="background:var(--purple-gradient);color:#fff;border:none;padding:8px 20px;font-weight:700;border-radius:var(--radius-sm);cursor:pointer;white-space:nowrap">✨ AI 微调</button>
           <button class="quick-act-btn" onclick="undoPublishRefine()" id="btnUndoRefine" disabled title="撤销上一次 AI 微调（栈空时不可用）" style="opacity:.45;cursor:not-allowed">↩ 撤销微调</button>
+          <button class="quick-act-btn" onclick="document.getElementById('publishImageFile').click()" id="btnUploadImage" title="上传本地图片并插入到光标处">📷 上传图片</button>
           <button class="quick-act-btn" onclick="autoIllustrate()" id="btnAutoIllustrate" title="按小节自动插入配图（示例占位图）">🖼 自动配图</button>
+          <input type="file" id="publishImageFile" accept="image/jpeg,image/jpg,image/png,image/webp,image/gif" style="display:none" onchange="uploadPublishImage(this)">
         </div>
         <div style="font-size:11px;color:var(--text2);margin-top:6px">💡 自动配图为示例占位图；正式发布到公众号前，建议替换为真实图片（可在编辑器中点击图片删除/替换）。</div>
       </div>
@@ -4756,6 +4771,7 @@ async function doPublishExecute(){
   var payload = getPublishPayload();
   var content = payload.content;
   var images = payload.images;
+  var coverImage = payload.cover_image;
   if (!content) {
     return toast('请选择候选内容或输入自定义内容', 'error');
   }
@@ -4778,7 +4794,7 @@ async function doPublishExecute(){
   rDiv.innerHTML = '<div class="loading"></div> ' + (isScheduled ? '正在设置定时发布...' : '正在发布...');
 
   try {
-    var body = { content: content, title: '', images: images };
+    var body = { content: content, title: '', images: images, cover_image: coverImage };
     if (isScheduled) { body.schedule = true; body.scheduled_at = scheduledAt; }
     var res = await apiFetch(PAPI+'/accounts/'+_publishAccountId+'/publish/execute', {method:'POST', body:JSON.stringify(body)});
     if (res.scheduled) {
@@ -4932,7 +4948,7 @@ function getPublishPayload(){
     }
   }
   if (!content && _publishCandidates.length > 0) content = _publishCandidates[0];
-  return { content: content, images: images };
+  return { content: content, images: images, cover_image: _publishCoverUrl || '' };
 }
 
 // ── AI 生成文章大纲 ──
@@ -5057,6 +5073,92 @@ function autoIllustrate(){
   toast('已插入 ' + n + ' 张配图（示例占位图，公众号发布前请替换为真实图片）', 'success');
 }
 
+// ── 本地图片上传（配图 / 封面图） ──
+var _publishCoverUrl = null;
+
+var PUBLISH_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+var PUBLISH_IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+
+function checkPublishImageFile(file){
+  var ext = (file.name || '').split('.').pop().toLowerCase();
+  if (PUBLISH_IMAGE_EXTS.indexOf(ext) === -1) return '仅支持 jpg/jpeg/png/webp/gif 图片';
+  if (file.size > PUBLISH_IMAGE_MAX_BYTES) return '图片不能超过 5MB（当前 ' + Math.round(file.size / 1024 / 1024 * 100) / 100 + 'MB）';
+  return '';
+}
+
+async function uploadPublishImageToServer(file){
+  var fd = new FormData();
+  fd.append('file', file);
+  return await apiFetch(PAPI + '/accounts/' + _publishAccountId + '/publish/upload-image', {method:'POST', body:fd});
+}
+
+async function uploadPublishImage(input){
+  var file = input.files && input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (!_publishAccountId) return toast('请先在左侧选择账号', 'error');
+  if (!_publishEditor) return toast('编辑器未就绪', 'error');
+  var err = checkPublishImageFile(file);
+  if (err) return toast(err, 'error');
+  var btn = document.getElementById('btnUploadImage');
+  if (btn){ btn.disabled = true; btn.textContent = '📷 上传中...'; }
+  try {
+    var res = await uploadPublishImageToServer(file);
+    var url = res && res.url;
+    if (!url) throw new Error(res && res.detail ? res.detail : '上传失败');
+    var pos = 0;
+    try {
+      var range = _publishEditor.getSelection();
+      pos = range ? range.index : (_publishEditor.getLength() ? _publishEditor.getLength() - 1 : 0);
+    } catch(e){ pos = 0; }
+    _publishEditor.insertEmbed(pos, 'image', url);
+    updatePublishCharCount();
+    toast('图片已插入到编辑器', 'success');
+  } catch(e){ toast('图片上传失败: ' + (e.message || ''), 'error'); }
+  if (btn){ btn.disabled = false; btn.textContent = '📷 上传图片'; }
+}
+
+async function uploadPublishCover(input){
+  var file = input.files && input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (!_publishAccountId) return toast('请先在左侧选择账号', 'error');
+  var err = checkPublishImageFile(file);
+  if (err) return toast(err, 'error');
+  try {
+    var res = await uploadPublishImageToServer(file);
+    var url = res && res.url;
+    if (!url) throw new Error(res && res.detail ? res.detail : '上传失败');
+    _publishCoverUrl = url;
+    renderPublishCover();
+    toast('封面图已设置', 'success');
+  } catch(e){ toast('封面图上传失败: ' + (e.message || ''), 'error'); }
+}
+
+function renderPublishCover(){
+  var slot = document.getElementById('publishCoverSlot');
+  if (!slot) return;
+  if (_publishCoverUrl){
+    slot.innerHTML = '<img src="' + esc(_publishCoverUrl) + '" style="width:100%;height:100%;object-fit:cover;display:block">' +
+      '<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.55);color:#fff;font-size:10px;text-align:center;padding:2px 0">点击更换</div>' +
+      '<div onclick="event.stopPropagation();clearPublishCover()" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.55);color:#fff;font-size:10px;border-radius:8px;padding:1px 6px;cursor:pointer">✕</div>';
+    slot.style.position = 'relative';
+    slot.style.borderStyle = 'solid';
+    slot.style.borderColor = 'rgba(99,102,241,0.5)';
+  } else {
+    slot.innerHTML = '<span style="font-size:20px">📷</span><span>点击设置封面图</span>';
+    slot.style.position = '';
+    slot.style.borderStyle = 'dashed';
+    slot.style.borderColor = 'rgba(148,163,184,0.5)';
+  }
+}
+
+function clearPublishCover(){
+  _publishCoverUrl = null;
+  renderPublishCover();
+  toast('已移除封面图', 'info');
+}
+
 // ── Quill 编辑器初始化 ──
 var _publishEditor = null;
 
@@ -5144,6 +5246,8 @@ function clearPublishEditor(){
   if (confirm('确定清空编辑器内容吗？')) {
     _publishEditor.root.innerHTML = '';
     _publishRefineStack = [];
+    _publishCoverUrl = null;
+    renderPublishCover();
     updatePublishCharCount();
     updateRefineUndoBtn();
     toast('编辑器已清空', 'info');
@@ -7131,6 +7235,7 @@ async function submitForReview(){
   var payload = getPublishPayload();
   var content = payload.content;
   var images = payload.images;
+  var coverImage = payload.cover_image;
   if (!content) return toast('请输入内容','error');
   var schedule = document.getElementById('publishScheduleToggle');
   var isScheduled = schedule && schedule.checked;
@@ -7142,7 +7247,7 @@ async function submitForReview(){
     scheduledAt = d + 'T' + t + ':00';
     if (new Date(scheduledAt) <= new Date()) return toast('定时发布时间必须在未来','error');
   }
-  var body = {content: content, title: '', images: images};
+  var body = {content: content, title: '', images: images, cover_image: coverImage};
   if (isScheduled) { body.schedule = true; body.scheduled_at = scheduledAt; }
   try {
     var res = await apiFetch(PAPI+'/accounts/'+_publishAccountId+'/publish/submit', {method:'POST', body:JSON.stringify(body)});

@@ -1,12 +1,13 @@
 """多平台获客 API — 账号管理 · 目标发现 · 内容生成 · 评论执行 · 效果追踪"""
 import asyncio
 import json
+import os
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, File, UploadFile
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
@@ -645,6 +646,50 @@ class PublishContentExecuteRequest(BaseModel):
     schedule: bool = False
     scheduled_at: Optional[str] = None  # ISO格式，如 "2026-07-25T09:00"
     images: List[str] = []  # 编辑器中配图的 URL 列表（保留排版与配图，防止发布时丢失）
+    cover_image: str = ""  # 封面图 URL（非空时作为 images 列表首位）
+
+
+# ── 配图上传：类型白名单 / 5MB 上限 / uuid 重命名（不保留用户原始文件名） ──
+ALLOWED_IMAGE_EXT = {"jpg", "jpeg", "png", "webp", "gif"}
+MAX_IMAGE_SIZE = 5 * 1024 * 1024
+PUBLISH_UPLOAD_DIRNAME = os.path.join("uploads", "publish")
+
+
+@router.post("/accounts/{account_id}/publish/upload-image")
+async def upload_publish_image(
+    account_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """上传本地配图/封面图，返回可访问的静态 URL"""
+    acc = _own_or_admin(PlatformAccount, account_id, current_user, db)
+    if not acc:
+        raise HTTPException(404, "账号不存在")
+
+    original_name = file.filename or ""
+    ext = original_name.rsplit(".", 1)[-1].lower() if "." in original_name else ""
+    if ext not in ALLOWED_IMAGE_EXT:
+        raise HTTPException(400, f"仅支持 {'/'.join(sorted(ALLOWED_IMAGE_EXT))} 格式图片")
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "文件内容为空")
+    if len(data) > MAX_IMAGE_SIZE:
+        raise HTTPException(400, "图片不能超过 5MB")
+
+    # 文件名用 uuid 重命名，禁止拼接用户原始文件名（防目录穿越）
+    upload_dir = os.path.join(settings.STATIC_DIR, PUBLISH_UPLOAD_DIRNAME)
+    os.makedirs(upload_dir, exist_ok=True)
+    saved_name = f"{uuid.uuid4().hex}.{ext}"
+    with open(os.path.join(upload_dir, saved_name), "wb") as f:
+        f.write(data)
+
+    return {
+        "success": True,
+        "url": f"/static/{PUBLISH_UPLOAD_DIRNAME}/{saved_name}".replace("\\", "/"),
+        "filename": saved_name,
+    }
 
 
 @router.post("/accounts/{account_id}/publish/generate")
@@ -887,7 +932,9 @@ async def execute_publish_content(
         user_id=current_user.id,
     )
     # P0：把编辑器里的配图落库，避免发布时图片丢失
-    task.images = json.dumps(req.images or [], ensure_ascii=False)
+    # P1a：封面图非空时置于 images 首位，作为发布首图
+    images = ([req.cover_image] if req.cover_image else []) + list(req.images or [])
+    task.images = json.dumps(images, ensure_ascii=False)
     db.add(task)
     db.commit()
     db.refresh(task)
@@ -942,6 +989,7 @@ class PublishContentSubmitRequest(BaseModel):
     schedule: bool = False
     scheduled_at: Optional[str] = None
     images: List[str] = []  # 编辑器中配图的 URL 列表（保留排版与配图，防止提交审核时丢失）
+    cover_image: str = ""  # 封面图 URL（非空时作为 images 列表首位）
 
 
 @router.post("/accounts/{account_id}/publish/submit")
@@ -972,7 +1020,9 @@ async def submit_publish_for_review(
         created_at=datetime.utcnow(),
     )
     # P0：把编辑器里的配图落库，避免提交审核后图片丢失
-    task.images = json.dumps(req.images or [], ensure_ascii=False)
+    # P1a：封面图非空时置于 images 首位，作为发布首图
+    images = ([req.cover_image] if req.cover_image else []) + list(req.images or [])
+    task.images = json.dumps(images, ensure_ascii=False)
     if req.schedule and req.scheduled_at:
         try:
             run_time = _parse_iso_utc(req.scheduled_at)

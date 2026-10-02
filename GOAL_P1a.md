@@ -65,15 +65,15 @@
   - `getPublishPayload()`（P0 已新增）增加返回 `cover_image: _publishCoverUrl`；`doPublishExecute`/`submitForReview` 请求体带上 `cover_image`
 
 **完成判据**：
-- [ ] `/accounts/{id}/publish/upload-image` 端点存在，校验类型+大小+uuid 重命名
-- [ ] 上传后图片存到 `static/uploads/publish/`，返回 url
-- [ ] main.py 的 `/static` 静态服务可用（上传的图能通过 url 访问）
-- [ ] 前端有"📷 上传图片"按钮，上传后图片插入编辑器
-- [ ] 封面图位存在，可选图并显示缩略图预览
-- [ ] `getPublishPayload` 返回 `cover_image`；execute/submit 请求体带 `cover_image`
-- [ ] `PublishContentExecuteRequest`/`SubmitRequest` 含 `cover_image` 字段
-- [ ] 安全：上传文件名不含用户原始名（uuid 重命名）；类型/大小校验代码可见
-- [ ] `autoIllustrate` 保留（picsum 仍可用作快速占位），不删除
+- [x] `/accounts/{id}/publish/upload-image` 端点存在，校验类型+大小+uuid 重命名
+- [x] 上传后图片存到 `static/uploads/publish/`，返回 url
+- [x] main.py 的 `/static` 静态服务可用（上传的图能通过 url 访问）
+- [x] 前端有"📷 上传图片"按钮，上传后图片插入编辑器
+- [x] 封面图位存在，可选图并显示缩略图预览
+- [x] `getPublishPayload` 返回 `cover_image`；execute/submit 请求体带 `cover_image`
+- [x] `PublishContentExecuteRequest`/`SubmitRequest` 含 `cover_image` 字段
+- [x] 安全：上传文件名不含用户原始名（uuid 重命名）；类型/大小校验代码可见
+- [x] `autoIllustrate` 保留（picsum 仍可用作快速占位），不删除
 
 ---
 
