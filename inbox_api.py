@@ -374,7 +374,7 @@ def convert_comment_to_lead(
         name=lead_name,
         company=req.lead_company or f"{c.platform} 评论线索",
         status=LeadStatus.NEW.value,
-        journey_stage="initial_contact",
+        journey_stage="new",
         ai_score=float(c.priority or 0),
         ai_intent=c.sentiment,
         source="comment_inbox",

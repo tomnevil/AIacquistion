@@ -327,7 +327,7 @@ async def _execute_action(
             name=lead_name,
             company=config.get("company", f"{context_data.get('platform', '')} 评论线索"),
             status=LeadStatus.NEW.value,
-            journey_stage="initial_contact",
+            journey_stage="new",
             ai_score=float(context_data.get("priority", 0)),
             ai_intent=context_data.get("sentiment", ""),
             source="comment_inbox",

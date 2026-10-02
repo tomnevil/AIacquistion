@@ -629,6 +629,14 @@ class PublishContentGenerateRequest(BaseModel):
     topic: str = ""
     style_hint: str = ""
     content_type: str = "post"  # post / article / thread
+    length: str = ""            # 篇幅：短/中/长 或字数
+    audience: str = ""          # 目标受众
+    keywords: str = ""          # 必须覆盖的关键词
+    strategy: str = ""          # 切入角度/策略
+    cta: str = ""               # 结尾互动引导
+    outline: str = ""           # 大纲（多行，每行一节）
+    custom_prompt: str = ""     # 用户自定义提示词
+    structured: bool = True     # 结构化排版（## 标题 / **加粗** / - 列表 / > 引用）
 
 
 class PublishContentExecuteRequest(BaseModel):
@@ -636,6 +644,7 @@ class PublishContentExecuteRequest(BaseModel):
     title: str = ""
     schedule: bool = False
     scheduled_at: Optional[str] = None  # ISO格式，如 "2026-07-25T09:00"
+    images: List[str] = []  # 编辑器中配图的 URL 列表（保留排版与配图，防止发布时丢失）
 
 
 @router.post("/accounts/{account_id}/publish/generate")
@@ -672,8 +681,35 @@ async def generate_publish_content(
 5. 有信息增量，能引发互动
 6. 如果是帖子类，适合带话题标签
 {('额外风格提示: ' + req.style_hint) if req.style_hint else ''}
+"""
 
-请生成3个候选版本，用"---"分隔。每个版本独立完整，内容充实。"""
+    # 用户附加要求（篇幅/受众/关键词/策略/CTA/大纲/自定义提示词/结构化排版）
+    extra = []
+    if req.length:
+        extra.append(f"篇幅: {req.length}")
+    if req.audience:
+        extra.append(f"目标受众: {req.audience}")
+    if req.keywords:
+        extra.append(f"必须覆盖关键词: {req.keywords}")
+    if req.strategy:
+        extra.append(f"切入角度/策略: {req.strategy}")
+    if req.cta:
+        extra.append(f"结尾互动引导: {req.cta}")
+    if req.outline:
+        extra.append("严格按以下大纲结构写作（每行一节，按顺序展开）:\n" + req.outline)
+    if req.custom_prompt:
+        extra.append("用户自定义要求: " + req.custom_prompt)
+    if req.structured:
+        extra.append(
+            "排版要求：使用结构化排版——开头单独一行给一个吸引人的标题；小节用 '## 小节标题'；"
+            "重点用 **加粗**；要点用 '- ' 列表；金句/总结用 '> ' 引用。"
+        )
+    if extra:
+        system += "\n用户附加要求:\n- " + "\n- ".join(extra)
+
+    system += ('\n\n请生成3个候选版本。每个候选必须是独立完整的文章；候选之间用单独一行的'
+               '标记 <<<CANDIDATE_SPLIT>>> 分隔（除此之外正文里不要出现该标记）。内容充实。'
+               '直接输出最终内容，不要输出任何思考过程或解释。')
 
     topic_str = f"主题方向: {req.topic}" if req.topic else "主题不限，自由发挥"
     user = f"""{topic_str}
@@ -685,7 +721,16 @@ async def generate_publish_content(
     except Exception as e:
         raise HTTPException(500, f"AI 调用失败: {str(e)}")
 
-    items = [line.strip() for line in result.split("---") if line.strip()]
+    items = [seg.strip() for seg in result.split("<<<CANDIDATE_SPLIT>>>") if seg.strip()]
+    # 过滤掉模型泄漏的英文思考过程（不含足量中文的片段）
+    import re as _re_split
+
+    def _is_reasoning(seg: str) -> bool:
+        head = seg[:300]
+        cn = len(_re_split.findall(r"[\u4e00-\u9fff]", head))
+        return bool(_re_split.match(r"^\s*(The user|Let me|I need|I should|Okay|Sure|First)", head)) and cn < 40
+
+    items = [s for s in items if not _is_reasoning(s)]
     if not items:
         items = [result.strip()]
 
@@ -696,6 +741,98 @@ async def generate_publish_content(
         "persona": persona_text,
         "candidates": items,
     }
+
+
+class PublishContentRefineRequest(BaseModel):
+    content: str
+    instruction: str
+    platform: str = ""
+
+
+@router.post("/accounts/{account_id}/publish/refine")
+async def refine_publish_content(
+    account_id: int,
+    req: PublishContentRefineRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """AI 二次微调 — 按用户修改指令改写已有内容（保持未涉及部分原意）"""
+    acc = _own_or_admin(PlatformAccount, account_id, current_user, db)
+    if not acc:
+        raise HTTPException(404, "账号不存在")
+    if not req.content.strip():
+        raise HTTPException(400, "内容为空")
+    if not req.instruction.strip():
+        raise HTTPException(400, "请填写修改指令")
+
+    style = PLATFORM_STYLES.get(acc.platform, PLATFORM_STYLES.get("weibo", {}))
+    persona_text = acc.persona or "普通用户"
+
+    system = f"""你是一个专业的内容编辑，负责按用户指令对已有内容做二次修改。
+
+账号信息:
+- 平台: {acc.platform}
+- 人设: {persona_text}
+- 平台风格: {style.get('tone', '真诚分享')}
+
+修改原则:
+1. 严格按用户修改指令改写，指令涉及的部分必须调整
+2. 未被指令涉及的部分保持原意，不要无脑重写
+3. 保留原文的结构化排版标记（## 标题、**加粗**、- 列表、> 引用）；若指令要求调整排版则按要求
+4. 只输出改写后的完整内容本身，不要输出说明文字或 diff"""
+
+    user = f"""【原文】
+{req.content}
+
+【修改指令】
+{req.instruction}
+
+请输出改写后的完整内容:"""
+
+    try:
+        result = await AIService._call_ai(system, user)
+    except Exception as e:
+        raise HTTPException(500, f"AI 调用失败: {str(e)}")
+
+    if not result.strip() or result.strip().startswith("[ERROR]"):
+        raise HTTPException(500, f"AI 返回异常: {result[:100]}")
+
+    return {"success": True, "content": result.strip(), "instruction": req.instruction}
+
+
+class ContentOutlineRequest(BaseModel):
+    topic: str
+    platform: str = "zhihu"
+    content_type: str = "article"
+    sections: int = 6
+
+
+@router.post("/content/outline")
+async def generate_content_outline(
+    req: ContentOutlineRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """生成文章大纲（结构化 JSON），供用户编辑后再生成正文"""
+    if not req.topic.strip():
+        raise HTTPException(400, "主题为空")
+    sections = max(3, min(10, req.sections or 6))
+
+    system = f"""你是内容策划专家，为{req.platform}平台的{req.content_type}类内容设计文章大纲。
+只输出 JSON，格式：
+{{"title": "建议标题", "outline": [{{"section": "小节标题", "points": ["要点1", "要点2"]}}]}}
+outline 共 {sections} 节，逻辑递进（如：钩子引入 → 核心观点 → 分节展开 → 案例支撑 → 总结与行动引导）。
+不要输出 JSON 以外的任何文字。"""
+
+    try:
+        result = await AIService._call_ai(system, f"主题：{req.topic}")
+    except Exception as e:
+        raise HTTPException(500, f"AI 调用失败: {str(e)}")
+
+    data = AIService._extract_json(result)
+    if not isinstance(data, dict) or not data.get("outline"):
+        raise HTTPException(500, "大纲解析失败，请重试")
+
+    return {"success": True, "title": data.get("title", req.topic), "outline": data["outline"]}
 
 
 @router.post("/accounts/{account_id}/publish/execute")
@@ -724,6 +861,8 @@ async def execute_publish_content(
         created_at=datetime.utcnow(),
         user_id=current_user.id,
     )
+    # P0：把编辑器里的配图落库，避免发布时图片丢失
+    task.images = json.dumps(req.images or [], ensure_ascii=False)
     db.add(task)
     db.commit()
     db.refresh(task)
@@ -777,6 +916,7 @@ class PublishContentSubmitRequest(BaseModel):
     title: str = ""
     schedule: bool = False
     scheduled_at: Optional[str] = None
+    images: List[str] = []  # 编辑器中配图的 URL 列表（保留排版与配图，防止提交审核时丢失）
 
 
 @router.post("/accounts/{account_id}/publish/submit")
@@ -806,6 +946,8 @@ async def submit_publish_for_review(
         user_id=current_user.id,
         created_at=datetime.utcnow(),
     )
+    # P0：把编辑器里的配图落库，避免提交审核后图片丢失
+    task.images = json.dumps(req.images or [], ensure_ascii=False)
     if req.schedule and req.scheduled_at:
         try:
             run_time = _parse_iso_utc(req.scheduled_at)

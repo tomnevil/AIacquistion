@@ -1482,7 +1482,7 @@ a:hover { text-decoration:underline; }
     <div style="margin-top:24px;padding-top:18px;border-top:1px dashed var(--border);">
       <p style="font-size:12px;color:var(--text2);text-align:center;margin-bottom:10px;">⚡ 快速测试账号</p>
       <div style="display:flex;gap:8px;">
-        <button class="quick-login-btn admin-btn" onclick="fillLogin('admin','admin123')" title="管理员 - 可查看全部数据">
+        <button class="quick-login-btn admin-btn" onclick="fillLogin('admin','admin123456')" title="管理员 - 可查看全部数据">
           <span style="font-size:16px;">🔧</span>
           <div>
             <strong>管理员</strong>
@@ -2450,6 +2450,18 @@ a:hover { text-decoration:underline; }
               <option value="none">不添加引导</option>
             </select>
           </div>
+          <div class="pa-field" style="flex:1 1 100%">
+            <label>🧭 文章大纲（AI 生成 / 手动编辑，每行一小节）</label>
+            <div style="display:flex;gap:8px;margin-bottom:6px;align-items:center">
+              <button class="btn btn-outline btn-sm" onclick="doGenerateOutline()" id="btnGenOutline" style="font-size:12px;padding:6px 14px">✨ AI 生成大纲</button>
+              <span style="font-size:11px;color:var(--text2)">先生成大纲 → 可手动增删改 → 再点「AI 生成内容」，正文将严格按大纲展开</span>
+            </div>
+            <textarea id="publishOutline" rows="6" placeholder="每行一小节，例如：&#10;01 钩子开头：用一个反常识案例引入&#10;02 核心观点：讲清楚为什么&#10;03 案例：真实数据支撑&#10;04 总结与行动引导" style="width:100%;padding:10px 12px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:13px;line-height:1.7;font-family:inherit;resize:vertical"></textarea>
+          </div>
+          <div class="pa-field" style="flex:1 1 100%">
+            <label>🖊️ 自定义提示词（对 AI 的额外要求，可与上面选项叠加）</label>
+            <textarea id="publishCustomPrompt" rows="3" placeholder="例：多用真实案例和具体数据；语气更犀利；避免说教；开头用疑问句引入；引用行业报告" style="width:100%;padding:10px 12px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:13px;line-height:1.7;font-family:inherit;resize:vertical"></textarea>
+          </div>
         </div>
       </div>
 
@@ -2472,6 +2484,17 @@ a:hover { text-decoration:underline; }
           <div id="publishEditor"><p style="color:var(--text2);text-align:center;padding:60px 20px">👈 请在左侧选择一个账号，然后输入主题开始创作</p></div>
         </div>
         <div id="publishPreviewArea" style="display:none"></div>
+      </div>
+
+      <!-- AI 二次微调 -->
+      <div style="margin-top:12px;padding:12px 14px;border:1.5px dashed rgba(99,102,241,0.4);border-radius:var(--radius-sm);background:rgba(99,102,241,0.04)">
+        <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:var(--primary)">✨ AI 二次微调 <span style="font-weight:400;color:var(--text2);font-size:11px">对当前编辑器内容按你的指令整体改写（未涉及部分保持原意）</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input type="text" id="publishRefineInput" placeholder="例：开头更犀利 / 第二段加一个真实案例 / 结尾加行动号召 / 整体压缩到 800 字 / 语气更像朋友聊天" style="flex:1;min-width:260px;padding:9px 12px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:13px" onkeydown="if(event.key==='Enter'){doPublishRefine();}">
+          <button class="btn" onclick="doPublishRefine()" id="btnPublishRefine" style="background:var(--purple-gradient);color:#fff;border:none;padding:8px 20px;font-weight:700;border-radius:var(--radius-sm);cursor:pointer;white-space:nowrap">✨ AI 微调</button>
+          <button class="quick-act-btn" onclick="autoIllustrate()" id="btnAutoIllustrate" title="按小节自动插入配图（示例占位图）">🖼 自动配图</button>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:6px">💡 自动配图为示例占位图；正式发布到公众号前，建议替换为真实图片（可在编辑器中点击图片删除/替换）。</div>
       </div>
 
       <!-- 内容工具条 -->
@@ -4657,7 +4680,10 @@ async function doPublishGenerate(){
       audience: audience,
       keywords: keywords,
       strategy: strategy,
-      cta: cta
+      cta: cta,
+      outline: (document.getElementById('publishOutline')?.value || '').trim(),
+      custom_prompt: (document.getElementById('publishCustomPrompt')?.value || '').trim(),
+      structured: true
     })});
     _publishCandidates = res.candidates || [];
     renderPublishCandidates(_publishCandidates);
@@ -4693,15 +4719,12 @@ function renderPublishCandidates(candidates){
 function selectPublishCandidate(idx){
   if (idx >= 0 && idx < _publishCandidates.length) {
     if (_publishEditor) {
-      // 将候选内容转为段落插入编辑器
       var txt = _publishCandidates[idx];
-      var html = txt.split('\n').filter(function(l){return l.trim();}).map(function(l){return '<p>'+esc(l)+'</p>';}).join('');
-      _publishEditor.root.innerHTML = html;
+      _publishEditor.root.innerHTML = mdToQuillHtml(txt);
       updatePublishCharCount();
     } else { initPublishEditor(function(){
       var txt = _publishCandidates[idx];
-      var html = txt.split('\n').filter(function(l){return l.trim();}).map(function(l){return '<p>'+esc(l)+'</p>';}).join('');
-      _publishEditor.root.innerHTML = html;
+      _publishEditor.root.innerHTML = mdToQuillHtml(txt);
       updatePublishCharCount();
     }); }
     // UI 标记选中
@@ -4728,20 +4751,12 @@ function selectPublishCandidate(idx){
 
 async function doPublishExecute(){
   if (!_publishAccountId) return toast('请先选择账号', 'error');
-  // 从 Quill 编辑器获取纯文本内容
-  var content = '';
-  if (_publishEditor) {
-    content = _publishEditor.getText().trim();
-  }
-  if (!content && _publishCandidates.length > 0) {
-    content = _publishCandidates[0];
-  }
+  // 从 Quill 编辑器取 Markdown 正文 + 配图（保留标题/加粗/列表/引用/图片）
+  var payload = getPublishPayload();
+  var content = payload.content;
+  var images = payload.images;
   if (!content) {
-    if (_publishCandidates.length > 0) {
-      content = _publishCandidates[0];
-    } else {
-      return toast('请选择候选内容或输入自定义内容', 'error');
-    }
+    return toast('请选择候选内容或输入自定义内容', 'error');
   }
 
   var schedule = document.getElementById('publishScheduleToggle');
@@ -4762,7 +4777,7 @@ async function doPublishExecute(){
   rDiv.innerHTML = '<div class="loading"></div> ' + (isScheduled ? '正在设置定时发布...' : '正在发布...');
 
   try {
-    var body = { content: content, title: '' };
+    var body = { content: content, title: '', images: images };
     if (isScheduled) { body.schedule = true; body.scheduled_at = scheduledAt; }
     var res = await apiFetch(PAPI+'/accounts/'+_publishAccountId+'/publish/execute', {method:'POST', body:JSON.stringify(body)});
     if (res.scheduled) {
@@ -4778,6 +4793,226 @@ async function doPublishExecute(){
     rDiv.innerHTML = '<div style="color:var(--red)">❌ 请求失败: '+esc(e.message||'网络错误')+'</div>';
   }
   loadAccounts(); loadStats();
+}
+
+// ── 简易 Markdown → Quill HTML（支持 ## 标题 / **加粗** / *斜体* / - 列表 / > 引用） ──
+function mdToQuillHtml(txt){
+  var lines = (txt || '').split('\n');
+  var html = '', inList = false, inQuote = false;
+  function closeBlocks(){
+    if (inList){ html += '</ul>'; inList = false; }
+    if (inQuote){ html += '</blockquote>'; inQuote = false; }
+  }
+  function inline(s){
+    s = esc(s);
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+    return s;
+  }
+  for (var i = 0; i < lines.length; i++){
+    var t = lines[i].trim();
+    if (!t){ closeBlocks(); continue; }
+    var hm = t.match(/^(#{1,4})\s+(.*)$/);
+    if (hm){
+      closeBlocks();
+      var tag = 'h' + Math.max(2, Math.min(4, hm[1].length + 1));
+      html += '<' + tag + '>' + inline(hm[2]) + '</' + tag + '>';
+      continue;
+    }
+    if (/^>\s?/.test(t)){
+      if (!inQuote){ closeBlocks(); html += '<blockquote>'; inQuote = true; }
+      html += '<p>' + inline(t.replace(/^>\s?/, '')) + '</p>';
+      continue;
+    }
+    if (/^[-*·]\s+/.test(t)){
+      if (!inList){ closeBlocks(); html += '<ul>'; inList = true; }
+      html += '<li>' + inline(t.replace(/^[-*·]\s+/, '')) + '</li>';
+      continue;
+    }
+    closeBlocks();
+    html += '<p>' + inline(t) + '</p>';
+  }
+  closeBlocks();
+  return html || '<p></p>';
+}
+
+// ── Quill HTML → Markdown（mdToQuillHtml 的逆转换，保留标题/加粗/列表/引用/图片） ──
+function quillInlineToMd(el){
+  var out = '';
+  var nodes = el.childNodes;
+  for (var i = 0; i < nodes.length; i++){
+    var n = nodes[i];
+    if (n.nodeType === 3){ out += n.textContent; continue; }
+    if (n.nodeType !== 1) continue;
+    var tag = (n.tagName || '').toLowerCase();
+    if (tag === 'img'){ out += '![](' + (n.getAttribute('src') || '') + ')'; continue; }
+    if (tag === 'br'){ out += '\n'; continue; }
+    var inner = quillInlineToMd(n);
+    if (tag === 'strong' || tag === 'b') out += '**' + inner + '**';
+    else if (tag === 'em' || tag === 'i') out += '*' + inner + '*';
+    else if (tag === 's' || tag === 'strike' || tag === 'del') out += '~~' + inner + '~~';
+    else if (tag === 'code') out += '`' + inner + '`';
+    else if (tag === 'a') out += '[' + inner + '](' + (n.getAttribute('href') || '') + ')';
+    else out += inner;
+  }
+  return out;
+}
+
+function quillLiToMd(li){
+  var out = '';
+  var nodes = li.childNodes;
+  for (var i = 0; i < nodes.length; i++){
+    var n = nodes[i];
+    if (n.nodeType === 3){ out += n.textContent; continue; }
+    if (n.nodeType !== 1) continue;
+    var tag = (n.tagName || '').toLowerCase();
+    if (tag === 'ul' || tag === 'ol') continue;  // 嵌套列表单独递归
+    out += quillInlineToMd(n);
+  }
+  return out;
+}
+
+function quillBlocksToMd(root, indent){
+  indent = indent || '';
+  var md = '';
+  var nodes = root.childNodes;
+  for (var i = 0; i < nodes.length; i++){
+    var n = nodes[i];
+    if (n.nodeType !== 1) continue;
+    var tag = (n.tagName || '').toLowerCase();
+    var line = '';
+    if (tag === 'img') line = '![](' + (n.getAttribute('src') || '') + ')';
+    else if (tag === 'h1') line = '# ' + quillInlineToMd(n);
+    else if (tag === 'h2') line = '## ' + quillInlineToMd(n);
+    else if (tag === 'h3') line = '### ' + quillInlineToMd(n);
+    else if (tag === 'h4' || tag === 'h5' || tag === 'h6') line = '#### ' + quillInlineToMd(n);
+    else if (tag === 'blockquote'){
+      md += indent + quillBlocksToMd(n, indent).split('\n').map(function(l){
+        return l.trim() ? '> ' + l : '';
+      }).join('\n') + '\n\n';
+      continue;
+    }
+    else if (tag === 'pre'){ md += '```\n' + (n.textContent || '') + '\n```\n\n'; continue; }
+    else if (tag === 'figure'){
+      md += quillBlocksToMd(n, indent);
+      continue;
+    }
+    else if (tag === 'ul' || tag === 'ol'){
+      var num = 1;
+      for (var j = 0; j < n.children.length; j++){
+        var li = n.children[j];
+        if ((li.tagName || '').toLowerCase() !== 'li') continue;
+        var prefix = (tag === 'ol') ? (num++) + '. ' : '- ';
+        md += indent + prefix + quillLiToMd(li).trim() + '\n';
+        md += quillBlocksToMd(li, indent + '  ');
+      }
+      md += '\n';
+      continue;
+    }
+    else line = quillInlineToMd(n);
+    if (line.trim()) md += indent + line.trim() + '\n\n';
+  }
+  return md;
+}
+
+// ── 发布/提交审核统一取内容：Markdown 正文 + 配图 URL 列表 ──
+function getPublishPayload(){
+  var content = '', images = [];
+  if (_publishEditor && _publishEditor.root){
+    try {
+      content = quillBlocksToMd(_publishEditor.root).replace(/\n{3,}/g, '\n\n').trim();
+      var imgs = _publishEditor.root.querySelectorAll('img');
+      for (var i = 0; i < imgs.length; i++){
+        var src = (imgs[i].getAttribute('src') || '').trim();
+        if (src && images.indexOf(src) === -1) images.push(src);
+      }
+    } catch(e){
+      content = _publishEditor.getText().trim();
+    }
+  }
+  if (!content && _publishCandidates.length > 0) content = _publishCandidates[0];
+  return { content: content, images: images };
+}
+
+// ── AI 生成文章大纲 ──
+async function doGenerateOutline(){
+  var topic = (document.getElementById('publishTopic')?.value || '').trim();
+  if (!topic) return toast('请先输入创作主题，再生成大纲', 'error');
+  var btn = document.getElementById('btnGenOutline');
+  if (btn){ btn.disabled = true; btn.textContent = '大纲生成中...'; }
+  try {
+    var res = await apiFetch(PAPI+'/content/outline', {method:'POST', body:JSON.stringify({
+      topic: topic,
+      content_type: (document.getElementById('publishContentType')?.value || 'article'),
+      sections: 6
+    })});
+    var outline = res.outline || [];
+    if (!outline.length) throw new Error('大纲为空');
+    var lines = outline.map(function(o, i){
+      var num = (i + 1 < 10 ? '0' : '') + (i + 1);
+      return num + ' ' + (o.section || '') + (o.points && o.points.length ? '：' + o.points.join('、') : '');
+    });
+    var ta = document.getElementById('publishOutline');
+    if (ta) ta.value = lines.join('\n');
+    toast('大纲已生成（' + outline.length + ' 节），可手动修改后再生成正文', 'success');
+  } catch(e){ toast('大纲生成失败: ' + (e.message || ''), 'error'); }
+  if (btn){ btn.disabled = false; btn.textContent = '✨ AI 生成大纲'; }
+}
+
+// ── AI 二次微调 ──
+async function doPublishRefine(){
+  if (!_publishAccountId) return toast('请先在左侧选择账号', 'error');
+  var inst = (document.getElementById('publishRefineInput')?.value || '').trim();
+  if (!inst) return toast('请输入修改指令，如：开头更犀利 / 第二段加一个真实案例 / 压缩到 800 字', 'error');
+  if (!_publishEditor) return toast('编辑器未就绪', 'error');
+  var content = _publishEditor.getText().trim();
+  if (!content) return toast('当前没有可微调的内容，请先选择候选或生成内容', 'error');
+  var btn = document.getElementById('btnPublishRefine');
+  if (btn){ btn.disabled = true; btn.textContent = 'AI 微调中...'; }
+  try {
+    var res = await apiFetch(PAPI+'/accounts/'+_publishAccountId+'/publish/refine', {method:'POST', body:JSON.stringify({
+      content: content,
+      instruction: inst
+    })});
+    if (res.success && res.content){
+      _publishEditor.root.innerHTML = mdToQuillHtml(res.content);
+      updatePublishCharCount();
+      document.getElementById('publishRefineInput').value = '';
+      toast('微调完成，可继续输入指令再次微调', 'success');
+    } else {
+      toast(res.error || '微调失败', 'error');
+    }
+  } catch(e){ toast('微调失败: ' + (e.message || ''), 'error'); }
+  if (btn){ btn.disabled = false; btn.textContent = '✨ AI 微调'; }
+}
+
+// ── 自动配图：在每个小节标题前插入配图（最多 4 张，示例占位图） ──
+function autoIllustrate(){
+  if (!_publishEditor) return toast('编辑器未就绪', 'error');
+  var text = _publishEditor.getText();
+  if (!text.trim()) return toast('当前没有内容可配图', 'error');
+  var topic = (document.getElementById('publishTopic')?.value || 'article').replace(/\s+/g, '') || 'article';
+  var lines = text.split('\n');
+  var idxs = [];
+  for (var i = 0; i < lines.length; i++){
+    var t = lines[i].trim();
+    if (!t) continue;
+    if (/^#{1,3}\s/.test(t)) idxs.push(i);
+  }
+  if (idxs.length === 0) idxs.push(0);
+  if (idxs.length > 4) idxs = idxs.slice(0, 4);
+  var n = 0;
+  for (var j = idxs.length - 1; j >= 0; j--){
+    var pos = 0;
+    for (var k = 0; k < idxs[j]; k++) pos += lines[k].length + 1;
+    var seed = encodeURIComponent(topic + '_' + idxs[j] + '_' + Date.now());
+    try {
+      _publishEditor.insertEmbed(pos, 'image', 'https://picsum.photos/seed/' + seed + '/800/420');
+      _publishEditor.insertText(pos + 1, '\n');
+      n++;
+    } catch(e){}
+  }
+  toast('已插入 ' + n + ' 张配图（示例占位图，公众号发布前请替换为真实图片）', 'success');
 }
 
 // ── Quill 编辑器初始化 ──
@@ -4814,7 +5049,7 @@ function initPublishEditor(cb){
         [{ 'list': 'ordered'}, { 'list': 'bullet' }],
         ['blockquote', 'code-block'],
         [{ 'header': [1, 2, 3, false] }],
-        ['link'],
+        ['link', 'image'],
         ['clean']
       ]
     }
@@ -6848,7 +7083,10 @@ async function checkOriginality(){
 // ── 发布提交审核 ──
 async function submitForReview(){
   if (!_publishAccountId) return toast('请先选择账号','error');
-  var content = _publishEditor ? _publishEditor.getText().trim() : '';
+  // 从 Quill 编辑器取 Markdown 正文 + 配图，避免提交审核时丢失排版与图片
+  var payload = getPublishPayload();
+  var content = payload.content;
+  var images = payload.images;
   if (!content) return toast('请输入内容','error');
   var schedule = document.getElementById('publishScheduleToggle');
   var isScheduled = schedule && schedule.checked;
@@ -6860,7 +7098,7 @@ async function submitForReview(){
     scheduledAt = d + 'T' + t + ':00';
     if (new Date(scheduledAt) <= new Date()) return toast('定时发布时间必须在未来','error');
   }
-  var body = {content: content, title: ''};
+  var body = {content: content, title: '', images: images};
   if (isScheduled) { body.schedule = true; body.scheduled_at = scheduledAt; }
   try {
     var res = await apiFetch(PAPI+'/accounts/'+_publishAccountId+'/publish/submit', {method:'POST', body:JSON.stringify(body)});
