@@ -1,5 +1,7 @@
 """知乎平台 — 评论 & 回答 (风控最宽松的主流平台)"""
 import asyncio
+import os
+import re as _re_mod
 from datetime import datetime
 from platforms.base import BaseSocialPlatform, LOGIN_WAIT_SECONDS
 from platforms.browser_engine import browser_engine
@@ -513,8 +515,393 @@ class ZhihuPlatform(BaseSocialPlatform):
                 pass
             return {"success": False, "error": str(e)}
 
+    # ── 配图辅助：把 images（URL 或本地路径）真正投递进知乎编辑器 ──
+
+    @staticmethod
+    def _resolve_local_image(src: str):
+        """把 /static/uploads/publish/x.png 之类的站内 URL 解析成本地文件路径"""
+        if not src:
+            return None
+        if os.path.isabs(src) and os.path.exists(src):
+            return src
+        rel = src.lstrip("/")
+        if rel.startswith("static/"):
+            rel = rel[len("static/"):]
+        try:
+            from config import settings
+            base = settings.STATIC_DIR
+        except Exception:
+            base = "static"
+        path = os.path.join(base, rel)
+        return path if os.path.exists(path) else None
+
+    @staticmethod
+    def _split_content_by_images(content: str):
+        """把 Markdown 按 ![xxx](url) 切成 [('md', 文本), ('image', url), ...] 片段"""
+        segs, buf, pos = [], [], 0
+        for m in _re_mod.finditer(r"!\[[^\]]*\]\(([^)\s]+)\)", content or ""):
+            head = content[pos:m.start()]
+            if head.strip():
+                segs.append(("md", head))
+            segs.append(("image", m.group(1)))
+            pos = m.end()
+        tail = content[pos:]
+        if tail.strip():
+            segs.append(("md", tail))
+        if not segs and content:
+            segs.append(("md", content))
+        return segs
+
+    # 知乎有两套编辑器：新版写文章页用 ProseMirror，旧文章编辑页用 Draft.js
+    EDITOR_JS = "div.ProseMirror, div.public-DraftEditor-content"
+    EDITOR_IMG_JS = "div.ProseMirror img, div.public-DraftEditor-content img"
+
+    async def _paste_html(self, use_page, html: str) -> int:
+        """把 HTML 以富文本粘贴进当前编辑器，返回粘贴后正文长度"""
+        try:
+            await use_page.evaluate(
+                """(html) => {
+                    const ed = document.querySelector('div.ProseMirror')
+                           || document.querySelector('div.public-DraftEditor-content');
+                    if (!ed) return false;
+                    ed.focus();
+                    const dt = new DataTransfer();
+                    dt.setData('text/html', html);
+                    dt.setData('text/plain', html.replace(/<[^>]+>/g, '\\n'));
+                    const ev = new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true});
+                    ed.dispatchEvent(ev);
+                    return true;
+                }""", html)
+        except Exception:
+            pass
+        await asyncio.sleep(2)
+        try:
+            return await use_page.evaluate(
+                "(sel) => { const e = document.querySelector(sel);"
+                " return e ? (e.innerText || e.textContent || '').length : 0; }",
+                self.EDITOR_JS)
+        except Exception:
+            return 0
+
+    async def _editor_upload_images(self, use_page, paths: list[str]) -> int:
+        """在光标处批量上传图片，返回成功张数。知乎编辑器隐藏 file input 也能 set_input_files"""
+        ok = 0
+        for p in paths:
+            try:
+                before = await use_page.evaluate(
+                    "() => document.querySelectorAll('div.ProseMirror img, div.public-DraftEditor-content img').length")
+            except Exception:
+                before = 0
+            uploaded = False
+            file_selectors = [
+                "input[type='file'][accept*='image']",
+                "input[type='file']",
+            ]
+            for sel in file_selectors:
+                try:
+                    loc = use_page.locator(sel).first
+                    if await loc.count() > 0:
+                        await loc.set_input_files(p, timeout=15000)
+                        uploaded = True
+                        break
+                except Exception:
+                    continue
+            if not uploaded:
+                # 兜底：点工具栏「图片」按钮触发文件选择框（点击必须在 expect_file_chooser 内）
+                try:
+                    async with use_page.expect_file_chooser(timeout=15000) as fc_info:
+                        clicked_img_btn = await use_page.evaluate("""() => {
+                            const btns = [...document.querySelectorAll('button,[role="button"]')];
+                            const b = btns.find(x => {
+                                const t = (x.getAttribute('aria-label') || '') + (x.getAttribute('title') || '');
+                                return /图片|插入图片|插图/.test(t) && (x.offsetWidth || x.offsetHeight);
+                            });
+                            if (b) { b.click(); return true; }
+                            return false;
+                        }""")
+                    if clicked_img_btn:
+                        chooser = await fc_info.value
+                        await chooser.set_files(p)
+                        uploaded = True
+                except Exception:
+                    continue
+            if not uploaded:
+                print(f"[Zhihu] 图片上传入口未找到，跳过: {os.path.basename(p)}")
+                continue
+            # 等图片真正进编辑器
+            for _ in range(20):
+                await asyncio.sleep(1)
+                try:
+                    now = await use_page.evaluate(
+                        "() => document.querySelectorAll('div.ProseMirror img, div.public-DraftEditor-content img').length")
+                except Exception:
+                    now = before
+                if now > before:
+                    ok += 1
+                    break
+            await browser_engine.human_delay(1, 2)
+        return ok
+
+    async def _editor_set_cover(self, use_page, cover_path: str) -> bool:
+        """设置文章封面（知乎编辑器「添加封面/题图」入口）。best-effort，失败不影响发布"""
+        if not cover_path:
+            return False
+        try:
+            opened = await use_page.evaluate("""() => {
+                const els = [...document.querySelectorAll('button,div,span,label')];
+                const t = els.find(x => {
+                    const txt = (x.innerText || '').trim();
+                    return /^(添加封面|设置封面|上传封面|题图)$/.test(txt) && (x.offsetWidth || x.offsetHeight);
+                });
+                if (t) { t.click(); return true; }
+                return false;
+            }""")
+            if not opened:
+                print("[Zhihu] 未找到封面入口，跳过封面设置")
+                return False
+            await browser_engine.human_delay(1, 2)
+            for sel in ["input[type='file'][accept*='image']", "input[type='file']"]:
+                try:
+                    loc = use_page.locator(sel).first
+                    if await loc.count() > 0:
+                        await loc.set_input_files(cover_path, timeout=15000)
+                        await browser_engine.human_delay(2, 3)
+                        print(f"[Zhihu] 封面已上传: {os.path.basename(cover_path)}")
+                        return True
+                except Exception:
+                    continue
+            return False
+        except Exception as e:
+            print(f"[Zhihu] 封面设置失败（不影响发布）: {e}")
+            return False
+
+    @staticmethod
+    async def _caret_to_end(use_page, content_area):
+        """把光标移到编辑器文档末尾（Ctrl+End），保证后续粘贴/插图都追加在最后"""
+        try:
+            await content_area.click()
+        except Exception:
+            pass
+        try:
+            await use_page.keyboard.press("Control+End")
+        except Exception:
+            pass
+        await asyncio.sleep(0.5)
+
+    async def _fill_editor(self, use_page, content_area, content: str, paste_fn=None) -> int:
+        """把 Markdown 正文填进编辑器：文本段富文本粘贴（保留排版），图片段真实上传。
+
+        paste_fn(use_page, html) -> 已填入的字符数（即 ZhihuPlatform._paste_html）；
+        不传则只上传图片不写文本。返回最后一次文本粘贴后的正文字数。
+        """
+        segs = self._split_content_by_images(content)
+        md_segs = [s for s in segs if s[0] == "md"]
+        md_len = sum(len(s[1]) for s in md_segs)
+        filled_len = 0
+        for kind, payload in segs:
+            # 每一步之前都把光标移到文末，否则插图会插在中间、后续段落顺序错乱
+            await self._caret_to_end(use_page, content_area)
+            if kind == "md":
+                if paste_fn:
+                    filled_len = await paste_fn(use_page, self.md_to_html(payload))
+            else:
+                local = self._resolve_local_image(payload)
+                if local:
+                    await self._editor_upload_images(use_page, [local])
+                else:
+                    print(f"[Zhihu] 配图不存在，跳过: {payload}")
+        await self._caret_to_end(use_page, content_area)
+        # 富文本粘贴整体失败时退回纯文本快速插入
+        if paste_fn and filled_len < min(50, max(10, md_len // 2)):
+            plain = "\n".join(s[1] for s in md_segs)
+            await browser_engine.insert_text(use_page, content_area, plain)
+        await browser_engine.human_delay(2, 4)
+        return filled_len
+
+    async def edit_published_article(self, url: str, content: str, images: list[str] = None) -> dict:
+        """编辑已发布文章：清空正文后按图文混排重新填充并保存（保留原 URL）
+
+        旧文章编辑页用的是 Draft.js 编辑器（public-DraftEditor-content），与新写文章页的
+        ProseMirror 不同，故此处统一走兼容两套编辑器的 _paste_html / _editor_upload_images。
+        """
+        try:
+            edit_url = url.rstrip("/") + "/edit"
+            await self._navigate_and_wait(edit_url)
+            await browser_engine.human_delay(3, 5)
+            if "/signin" in self.page.url:
+                return {"success": False, "error": "编辑页跳转登录页，登录态已失效"}
+
+            content_area = None
+            for sel in [
+                "div.public-DraftEditor-content[contenteditable='true']",
+                "div.ProseMirror[contenteditable='true']",
+                "div[contenteditable='true']",
+            ]:
+                loc = self.page.locator(sel)
+                if await loc.count() > 0:
+                    content_area = loc.first
+                    break
+            if not content_area:
+                return {"success": False, "error": "未找到正文编辑器"}
+
+            # 旧文章正文是异步加载的，等到长度稳定再动手
+            loaded = 0
+            for _ in range(15):
+                await asyncio.sleep(2)
+                loaded = await self.page.evaluate(
+                    "(sel) => { const e = document.querySelector(sel);"
+                    " return e ? (e.innerText || e.textContent || '').length : 0; }",
+                    self.EDITOR_JS)
+                if loaded > 500:
+                    break
+            print(f"[Zhihu] 编辑页原文长度: {loaded}")
+            if loaded < 100:
+                return {"success": False, "error": f"编辑页正文未加载 (len={loaded})，已放弃避免清空失败"}
+
+            await content_area.click()
+            await self.page.keyboard.press("Control+a")
+            await self.page.keyboard.press("Delete")
+            await browser_engine.human_delay(1, 2)
+
+            await self._fill_editor(self.page, content_area, content, self._paste_html)
+            after = await self.page.evaluate(
+                "(sel) => { const e = document.querySelector(sel);"
+                " return e ? (e.innerText || e.textContent || '').length : 0; }",
+                self.EDITOR_JS)
+            print(f"[Zhihu] 重填后长度: {after}")
+
+            img_list = list(images or [])
+            if img_list:
+                cover_local = self._resolve_local_image(img_list[0])
+                if cover_local:
+                    await self._editor_set_cover(self.page, cover_local)
+
+            saved = await self.page.evaluate("""() => {
+                const els = [...document.querySelectorAll('button,span,div,a')];
+                const b = els.find(x => {
+                    const t = (x.innerText || '').trim();
+                    return /^(保存|更新|发布更新|保存并更新|确认修改)$/.test(t)
+                        && (x.offsetWidth || x.offsetHeight);
+                });
+                if (b) { b.scrollIntoView({block: 'center'}); b.click(); return true; }
+                return false;
+            }""")
+            if not saved:
+                return {"success": False, "error": "未找到保存/更新按钮（内容已改但未提交）"}
+            await browser_engine.human_delay(5, 8)
+            return {"success": True, "url": url.rstrip("/"), "len_after": after}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def delete_article(self, url: str) -> dict:
+        """删除自己已发布的文章。先试文章页「…」菜单，再试创作中心内容管理列表"""
+        article_id = url.rstrip("/").split("/")[-1]
+
+        async def _click_menu_item(labels: list[str]) -> bool:
+            """在已打开的菜单/弹层里点指定文案的项"""
+            return bool(await self.page.evaluate(
+                """(labels) => {
+                    const els = [...document.querySelectorAll('button,[role="menuitem"],[role="button"],li,div,span')];
+                    for (const lb of labels) {
+                        const t = els.find(x => {
+                            const s = (x.innerText || '').trim();
+                            return s === lb && (x.offsetWidth || x.offsetHeight);
+                        });
+                        if (t) { t.scrollIntoView({block:'center'}); t.click(); return true; }
+                    }
+                    return false;
+                }""", labels))
+
+        async def _confirm() -> bool:
+            """确认删除二次弹窗"""
+            for _ in range(10):
+                await asyncio.sleep(1)
+                if await _click_menu_item(["确定", "确认", "删除", "确认删除"]):
+                    return True
+            return False
+
+        # 策略 A：文章页作者操作菜单（「…」/「更多」/「设置」Post-ActionMenuButton）
+        try:
+            await self._navigate_and_wait(url)
+            await browser_engine.human_delay(2, 4)
+            opened = await self.page.evaluate("""() => {
+                const cands = [...document.querySelectorAll('button,[role="button"],div,span')];
+                const t = cands.find(x => {
+                    const s = (x.innerText || '').trim();
+                    const al = x.getAttribute('aria-label') || '';
+                    const cls = (typeof x.className === 'string' ? x.className : '');
+                    if (!(x.offsetWidth || x.offsetHeight)) return false;
+                    return s === '...' || s === '…' || /更多|更多操作/.test(al)
+                        || /Post-ActionMenuButton/.test(cls);
+                });
+                if (t) { t.scrollIntoView({block:'center'}); t.click(); return true; }
+                return false;
+            }""")
+            print(f"[Zhihu] 文章页菜单打开: {opened}")
+            if opened:
+                await browser_engine.human_delay(1, 2)
+                if await _click_menu_item(["删除"]):
+                    print("[Zhihu] 已点删除，等待确认弹窗")
+                    await _confirm()
+                else:
+                    print("[Zhihu] 菜单中未找到「删除」")
+        except Exception as e:
+            print(f"[Zhihu] 文章页删除入口异常: {e}")
+
+        # 校验是否已删
+        await asyncio.sleep(3)
+        if await self._is_deleted(url):
+            return {"success": True, "url": url}
+
+        # 策略 B：创作中心 - 内容管理 - 文章
+        try:
+            await self._navigate_and_wait("https://www.zhihu.com/creator/content-manage/article")
+            await browser_engine.human_delay(3, 5)
+            clicked = await self.page.evaluate(
+                """(aid) => {
+                    const link = [...document.querySelectorAll('a')]
+                        .find(a => (a.getAttribute('href') || '').includes(aid));
+                    if (!link) return 'no_link';
+                    let row = link.closest('[class*="Item"],[class*="item"],li,tr') || link.parentElement;
+                    for (let i = 0; i < 4 && row && row.parentElement; i++) row = row.parentElement;
+                    const btns = [...row.querySelectorAll('button,[role="button"],div,span')];
+                    const more = btns.find(x => {
+                        const s = (x.innerText || '').trim();
+                        const al = x.getAttribute('aria-label') || '';
+                        return (s === '...' || s === '…' || /更多/.test(s) || /更多/.test(al))
+                            && (x.offsetWidth || x.offsetHeight);
+                    });
+                    if (!more) return 'no_more';
+                    more.click();
+                    return 'opened';
+                }""", article_id)
+            print(f"[Zhihu] 内容管理入口: {clicked}")
+            if clicked == "opened":
+                await browser_engine.human_delay(1, 2)
+                if await _click_menu_item(["删除"]):
+                    await _confirm()
+        except Exception as e:
+            print(f"[Zhihu] 内容管理删除异常: {e}")
+
+        await asyncio.sleep(3)
+        if await self._is_deleted(url):
+            return {"success": True, "url": url}
+        return {"success": False, "error": f"未能确认删除，文章可能仍存在: {url}"}
+
+    async def _is_deleted(self, url: str) -> bool:
+        """访问文章页，判断是否已删除/不可访问"""
+        try:
+            await self._navigate_and_wait(url)
+            await asyncio.sleep(2)
+            return bool(await self.page.evaluate("""() => {
+                const t = (document.body.innerText || '');
+                return /404|页面不存在|内容已删除|你访问的页面不存在|文章不存在/.test(t);
+            }"""))
+        except Exception:
+            return False
+
     async def publish_content(self, title: str, content: str, images: list[str] = None) -> dict:
-        """知乎写文章 — 打开创作中心，进入编辑器，填写并发布"""
+        """知乎写文章 — 打开创作中心，进入编辑器，填写并发布（支持插图与封面）"""
         try:
             # 1. 直接打开知乎文章编辑器（zhuanlan.zhihu.com 与 www 共享登录态，
             #    避免创作中心"写文章"入口 + 新标签页切换的不确定性）
@@ -595,34 +982,17 @@ class ZhihuPlatform(BaseSocialPlatform):
                 return {"success": False, "error": "未找到正文编辑器"}
 
             await content_area.click()
-            # 优先以富文本 HTML 粘贴（保留排版：标题/加粗/列表/引用），失败则退回纯文本
-            html = self.md_to_html(content)
-            try:
-                await use_page.evaluate(
-                    """(html) => {
-                        const ed = document.querySelector('div.ProseMirror');
-                        if (!ed) return false;
-                        ed.focus();
-                        const dt = new DataTransfer();
-                        dt.setData('text/html', html);
-                        dt.setData('text/plain', html.replace(/<[^>]+>/g, '\\n'));
-                        const ev = new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true});
-                        ed.dispatchEvent(ev);
-                        return true;
-                    }""", html)
-            except Exception:
-                pass
-            # 校验正文是否填入成功，失败则退回纯文本快速插入
-            filled_len = 0
-            try:
-                filled_len = await content_area.evaluate(
-                    "el => (el.innerText || el.textContent || '').length"
-                )
-            except Exception:
-                pass
-            if filled_len < min(50, max(10, len(content) // 2)):
-                await browser_engine.insert_text(use_page, content_area, content)
-            await browser_engine.human_delay(2, 4)
+
+            # 按 ![](url) 把正文切成文本段与图片段：文本用富文本粘贴（保留排版），
+            # 图片走真实上传插到光标处，实现图文混排
+            filled_len = await self._fill_editor(use_page, content_area, content, self._paste_html)
+
+            # 封面图（best-effort）
+            img_list = list(images or [])
+            if img_list:
+                cover_local = self._resolve_local_image(img_list[0])
+                if cover_local:
+                    await self._editor_set_cover(use_page, cover_local)
 
             # 6. 点击工具栏「发布」按钮
             clicked = await use_page.evaluate("""() => {

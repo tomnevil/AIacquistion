@@ -32,3 +32,7 @@ _p7_probe.py
 tmp_douyin_login.py
 static/*.backup*
 static/*.final_backup
+# 用户上传的配图（运行时数据，非源码）
+static/uploads/
+# 实测/调试产生的草稿
+zhihu_draft_*.md
