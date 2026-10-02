@@ -4,6 +4,7 @@
 为每个平台生成符合其调性的评论/帖子/回复
 """
 import json
+import re
 from services.ai_service import AIService
 
 # ── 平台内容策略配置 ──
@@ -251,23 +252,25 @@ class ContentStrategy:
 {f'产品背景: {json.dumps(product_info, ensure_ascii=False)}' if product_info else ''}
 {f'SEO关键词: {keywords}' if keywords else ''}
 
-请以JSON格式返回:
+请以JSON格式返回(\"content\"字段内如需换行请用 \\n 转义，且不要使用英文双引号):
 {{
     "title": "标题",
     "content": "正文",
     "hashtags": ["标签1", "标签2", "标签3"]
 }}"""
 
-        try:
-            result = await AIService._call_ai(system, user)
-            result = result.strip().removeprefix("```json").removesuffix("```").strip()
-            return json.loads(result)
-        except:
+        result = await AIService._call_ai(system, user)
+        data = AIService._extract_json(result)
+        if isinstance(data, dict) and data.get("content"):
             return {
-                "title": topic,
-                "content": await AIService._call_ai(system, user),
-                "hashtags": [],
+                "title": data.get("title") or topic,
+                "content": data.get("content", ""),
+                "hashtags": data.get("hashtags") or [],
             }
+        # 兜底：解析失败时去掉围栏，直接把文本当正文
+        cleaned = re.sub(r"^```[a-zA-Z0-9_-]*\s*", "", result.strip())
+        cleaned = re.sub(r"\s*```$", "", cleaned).strip()
+        return {"title": topic, "content": cleaned, "hashtags": []}
 
     @staticmethod
     async def generate_variations(
@@ -285,13 +288,17 @@ class ContentStrategy:
 
 以JSON数组返回: ["版本1", "版本2", "版本3"]"""
 
-        try:
-            result = await AIService._call_ai(system, base_content)
-            result = result.strip().removeprefix("```json").removesuffix("```").strip()
-            variants = json.loads(result)
-            return variants if isinstance(variants, list) else [base_content]
-        except:
-            return [base_content]
+        result = await AIService._call_ai(system, base_content)
+        variants = AIService._extract_json(result)
+        if isinstance(variants, list) and variants:
+            return [str(v).strip() for v in variants if str(v).strip()]
+        # 兜底：模型未返回合法 JSON 时，按编号(1./-/*/一、) 或空行切分
+        text = re.sub(r"^```[a-zA-Z0-9_-]*\s*", "", result.strip())
+        text = re.sub(r"\s*```$", "", text).strip()
+        parts = re.split(r"\n\s*\n|(?=^\s*(?:\d+[.、)]|[-*])\s)", text, flags=re.M)
+        cleaned = [re.sub(r'^\s*(?:\d+[.、)]|[-*])\s*', "", p).strip() for p in parts]
+        cleaned = [c for c in cleaned if len(c) > 10]
+        return cleaned if len(cleaned) > 1 else [base_content]
 
 
 content_strategy = ContentStrategy()

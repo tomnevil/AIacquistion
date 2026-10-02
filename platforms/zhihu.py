@@ -40,7 +40,13 @@ class ZhihuPlatform(BaseSocialPlatform):
             return False
 
     async def post_comment(self, target_url: str, comment_text: str) -> dict:
-        """知乎评论 — 兼容回答页（需点击"添加评论"按钮展开输入框）"""
+        """知乎评论 — 展开目标回答的评论区后发表评论
+
+        知乎评论编辑器不是初始渲染的：必须先点击该回答的「N 条评论」按钮展开；
+        且页面常含多个「N 条评论」按钮（其他回答/推荐），需按 answer_id 精确匹配，
+        否则会评论到别的回答下。提交后回读该回答评论做校验，避免"假成功"。
+        """
+        import re as _re
         try:
             comment_text = self._build_comment(comment_text)[:self.max_comment_length]
             await self._navigate_and_wait(target_url)
@@ -49,127 +55,112 @@ class ZhihuPlatform(BaseSocialPlatform):
             # 知乎操作栏在内容底部，先滚动到底部附近
             await self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             await browser_engine.human_delay(2, 3)
-            await browser_engine.human_scroll(self.page, -3)  # 稍微回滚，避免被悬浮栏遮挡
+            await browser_engine.human_scroll(self.page, -3)
             await browser_engine.human_delay(1, 2)
 
-            # 1. 先找已经展开的评论输入框
-            comment_selectors = [
-                "div.public-DraftEditor-content[contenteditable='true']",
-                "div[contenteditable='true'][class*='DraftEditor-content']",
-                "div[class*='CommentEditor'] textarea",
-                "div[class*='comment-Editor'] textarea",
-                "div[class*='Comment'] textarea",
-                "textarea[placeholder*='评论']",
-                "textarea[placeholder*='输入评论']",
-                "textarea[placeholder*='写下你的评论']",
-                "div[contenteditable='true'][placeholder*='评论']",
-                "div[contenteditable='true'][placeholder*='输入评论']",
-                "div[contenteditable='true'][class*='Comment']",
-            ]
+            m = _re.search(r"/answer/(\d+)", target_url or "")
+            answer_id = m.group(1) if m else ""
 
-            async def find_visible_input():
-                for selector in comment_selectors:
+            async def find_editor():
+                for selector in (
+                    "div.public-DraftEditor-content[contenteditable='true']",
+                    "div[contenteditable='true'][class*='DraftEditor-content']",
+                    "div[class*='CommentEditor'] div[contenteditable='true']",
+                    "textarea[placeholder*='评论']",
+                ):
                     loc = self.page.locator(selector).first
-                    if await loc.count() > 0 and await loc.is_visible():
-                        return loc
+                    try:
+                        if await loc.count() > 0 and await loc.is_visible():
+                            return loc
+                    except Exception:
+                        pass
                 return None
 
-            comment_input = await find_visible_input()
+            comment_input = await find_editor()
 
-            # 2. 没找到展开输入框 -> 精确点击"添加评论"按钮
+            # 未展开 → 点击目标回答的「N 条评论」按钮（按 answer_id 精确匹配，再兜底）
             if not comment_input:
-                add_comment_selectors = [
-                    "button.ContentItem-action:has-text('添加评论')",
+                expand_selectors = []
+                if answer_id:
+                    expand_selectors += [
+                        f'div.AnswerItem[name="{answer_id}"] button:has-text("条评论")',
+                        f'[name="{answer_id}"] button.ContentItem-action',
+                    ]
+                expand_selectors += [
+                    "button.ContentItem-action:has-text('条评论')",
                     "button:has-text('添加评论')",
-                    "button.Button--plain:has-text('添加评论')",
                     "button:has-text('写评论')",
-                    "button:has-text('发表评论')",
                 ]
-                clicked = False
-                for selector in add_comment_selectors:
+                for selector in expand_selectors:
                     btns = self.page.locator(selector)
                     count = await btns.count()
-                    if count == 0:
-                        continue
-                    # 优先点击可见的；如果都不可见，点击最后一个（通常是最底部主回答的）
                     for i in range(count):
                         btn = btns.nth(i)
                         try:
-                            if await btn.is_visible():
-                                await browser_engine.human_click(self.page, btn)
-                                clicked = True
+                            if not await btn.is_visible():
+                                continue
+                            await btn.scroll_into_view_if_needed()
+                            await browser_engine.human_click(self.page, btn)
+                            await browser_engine.human_delay(2, 4)
+                            comment_input = await find_editor()
+                            if comment_input:
                                 break
-                        except Exception:
-                            continue
-                    if not clicked and count > 0:
-                        try:
-                            await btns.last.click(force=True)
-                            clicked = True
-                        except Exception:
-                            pass
-                    if clicked:
-                        await browser_engine.human_delay(3, 5)
-                        comment_input = await find_visible_input()
-                        if comment_input:
-                            break
-
-            # 3. 仍然找不到 -> 尝试点"评论"（带数量）作为兜底
-            if not comment_input:
-                fallback_selectors = [
-                    "button.ContentItem-action:has-text('评论')",
-                    "button:has-text('条评论')",
-                    "div[class*='BottomAction'] button:has-text('评论')",
-                ]
-                for selector in fallback_selectors:
-                    btns = self.page.locator(selector)
-                    count = await btns.count()
-                    if count == 0:
-                        continue
-                    for i in range(count):
-                        btn = btns.nth(i)
-                        try:
-                            if await btn.is_visible():
-                                await browser_engine.human_click(self.page, btn)
-                                await browser_engine.human_delay(3, 5)
-                                comment_input = await find_visible_input()
-                                if comment_input:
-                                    break
                         except Exception:
                             continue
                     if comment_input:
                         break
 
-            # 4. 还是找不到 -> 截图调试
             if not comment_input:
                 await self._debug_screenshot('comment_not_found')
-                return {"success": False, "error": "评论功能未找到：无法定位评论输入框或评论按钮"}
+                return {"success": False, "error": "无法定位评论输入框（评论区未展开）"}
 
-            # 5. 输入评论
+            # 输入评论
             await browser_engine.human_type(self.page, comment_input, comment_text)
-            await browser_engine.human_delay(2, 3)
+            await browser_engine.human_delay(1, 2)
 
-            # 6. 点击提交
-            submit_selectors = [
-                "button:has-text('发布')",
-                "button:has-text('发送')",
-                "button:has-text('评论')",
-                "div[class*='submit']",
-                "button[type='submit']",
-            ]
-            submit_btn = None
-            for selector in submit_selectors:
-                loc = self.page.locator(selector).first
-                if await loc.count() > 0 and await loc.is_visible():
-                    submit_btn = loc
-                    break
+            # 提交：只点评论编辑器所在容器内的「发布」按钮，
+            # 避免误点「N 条评论」计数按钮 / 「回复」按钮造成假成功
+            submitted = await self.page.evaluate("""() => {
+                const editors = [...document.querySelectorAll("div.public-DraftEditor-content")]
+                    .filter(e => e.offsetWidth || e.offsetHeight);
+                const target = editors[editors.length - 1];
+                if (!target) return false;
+                let node = target, btn = null;
+                for (let d = 0; d < 8 && node; d++) {
+                    const btns = [...node.querySelectorAll('button')];
+                    btn = btns.find(b => (b.innerText || '').trim() === '发布');
+                    if (btn) break;
+                    node = node.parentElement;
+                }
+                if (!btn) {
+                    btn = [...document.querySelectorAll('button')].find(b => (b.innerText || '').trim() === '发布');
+                }
+                if (btn) { btn.scrollIntoView({block: 'center'}); btn.click(); return true; }
+                return false;
+            }""")
 
-            if not submit_btn:
+            if not submitted:
                 await self._debug_screenshot('submit_not_found')
-                return {"success": False, "error": "发布按钮未找到"}
+                return {"success": False, "error": "未找到评论「发布」按钮"}
 
-            await browser_engine.human_click(self.page, submit_btn)
             await browser_engine.human_delay(3, 5)
-            return {"success": True}
+
+            # 提交后校验：回读该回答最新评论，确认内容已出现
+            verified = False
+            if answer_id:
+                try:
+                    verified = bool(await self.page.evaluate("""async ([aid, snippet]) => {
+                        try {
+                            const r = await fetch(`/api/v4/answers/${aid}/comments?limit=20&offset=0&order=reverse`, {credentials: 'include'});
+                            if (!r.ok) return false;
+                            const j = await r.json();
+                            return (j.data || []).some(c => (c.content || '').includes(snippet));
+                        } catch (e) { return false; }
+                    }""", [answer_id, comment_text[:20]]))
+                except Exception:
+                    pass
+
+            return {"success": True, "verified": verified}
         except Exception as e:
             await self._debug_screenshot('exception')
             return {"success": False, "error": str(e)}
@@ -604,66 +595,75 @@ class ZhihuPlatform(BaseSocialPlatform):
                 return {"success": False, "error": "未找到正文编辑器"}
 
             await content_area.click()
-            await browser_engine.human_type(use_page, content_area, content)
+            # 优先以富文本 HTML 粘贴（保留排版：标题/加粗/列表/引用），失败则退回纯文本
+            html = self.md_to_html(content)
+            try:
+                await use_page.evaluate(
+                    """(html) => {
+                        const ed = document.querySelector('div.ProseMirror');
+                        if (!ed) return false;
+                        ed.focus();
+                        const dt = new DataTransfer();
+                        dt.setData('text/html', html);
+                        dt.setData('text/plain', html.replace(/<[^>]+>/g, '\\n'));
+                        const ev = new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true});
+                        ed.dispatchEvent(ev);
+                        return true;
+                    }""", html)
+            except Exception:
+                pass
+            # 校验正文是否填入成功，失败则退回纯文本快速插入
+            filled_len = 0
+            try:
+                filled_len = await content_area.evaluate(
+                    "el => (el.innerText || el.textContent || '').length"
+                )
+            except Exception:
+                pass
+            if filled_len < min(50, max(10, len(content) // 2)):
+                await browser_engine.insert_text(use_page, content_area, content)
             await browser_engine.human_delay(2, 4)
 
-            # 6. 点击"发布"按钮（多选择器兜底 + JS 兜底）
-            publish_btn = None
-            publish_selectors = [
-                "button:has-text('发布')",
-                "button:has-text('发表')",
-                "button[class*='publish']",
-                "button:has-text('确定')",
-            ]
-            for sel in publish_selectors:
-                loc = use_page.locator(sel)
-                cnt = await loc.count()
-                if cnt > 0:
-                    for i in range(cnt):
-                        btn = loc.nth(i)
-                        try:
-                            if await btn.is_visible() and await btn.is_enabled():
-                                publish_btn = btn
-                                break
-                        except Exception:
-                            continue
-                    if publish_btn:
-                        break
+            # 6. 点击工具栏「发布」按钮
+            clicked = await use_page.evaluate("""() => {
+                const btns = [...document.querySelectorAll('button')];
+                const pub = btns.find(b => (b.innerText || '').trim() === '发布'
+                    && (b.offsetWidth || b.offsetHeight));
+                if (pub) { pub.scrollIntoView({block: 'center'}); pub.click(); return true; }
+                return false;
+            }""")
+            if not clicked:
+                await self._debug_screenshot("publish_no_submit")
+                return {"success": False, "error": "未找到发布按钮"}
 
-            if not publish_btn:
-                found = await use_page.evaluate("""() => {
-                    const btns = Array.from(document.querySelectorAll('button'));
-                    const p = btns.find(b => {
-                        const t = (b.innerText || '').trim();
-                        return t === '发布' || t === '发表';
-                    });
-                    if (p) { p.click(); return true; }
-                    return false;
-                }""")
-                if not found:
-                    await self._debug_screenshot("publish_no_submit")
-                    return {"success": False, "error": "未找到发布按钮"}
+            # 7. 等待跳转到文章页 —— 发布成功的唯一可靠标志是 URL 变为
+            #    /p/<id>（编辑器为 /p/<id>/edit）。若弹二次确认，点一次其中的「发布」。
+            import re as _re
+            publish_url = ""
+            dialog_clicked = False
+            for _ in range(30):  # 最多约 60 秒
+                await asyncio.sleep(2)
+                cur = use_page.url
+                if _re.search(r"/p/\d+/?$", cur):
+                    publish_url = cur.rstrip("/")
+                    break
+                if not dialog_clicked:
+                    try:
+                        dialog_clicked = bool(await use_page.evaluate("""() => {
+                            const modals = [...document.querySelectorAll('[class*="Modal"], [role="dialog"]')]
+                                .filter(e => e.offsetWidth || e.offsetHeight);
+                            if (!modals.length) return false;
+                            const b = [...modals[modals.length - 1].querySelectorAll('button')]
+                                .find(x => (x.innerText || '').trim() === '发布');
+                            if (b) { b.click(); return true; }
+                            return false;
+                        }"""))
+                    except Exception:
+                        pass
 
-            if publish_btn:
-                await browser_engine.human_click(use_page, publish_btn)
-
-            await browser_engine.human_delay(4, 6)
-
-            # 7. 处理可能的二次确认弹窗
-            confirm_btn = use_page.locator("button:has-text('确定'), button:has-text('确认发布'), button:has-text('确认')").first
-            if await confirm_btn.count() > 0:
-                try:
-                    if await confirm_btn.is_visible():
-                        await browser_engine.human_click(use_page, confirm_btn)
-                        await browser_engine.human_delay(3, 5)
-                except Exception:
-                    pass
-
-            # 记录文章页 URL — 发布后停留在编辑器（/p/xxx/edit），
-            # 去掉 /edit 后缀得到文章页，供效果回采直接访问
-            publish_url = use_page.url
-            if publish_url.rstrip("/").endswith("/edit"):
-                publish_url = publish_url.rstrip("/")[: -len("/edit")]
+            if not publish_url:
+                await self._debug_screenshot("publish_not_confirmed")
+                return {"success": False, "error": f"发布未确认（可能仍是草稿），当前 URL: {use_page.url}"}
 
             return {
                 "success": True,

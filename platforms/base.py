@@ -184,5 +184,73 @@ class BaseSocialPlatform(ABC):
             return False
         return True
 
+    async def _debug_screenshot(self, name: str):
+        """失败时保存截图与页面源码，便于排查（各平台通用）"""
+        try:
+            from datetime import datetime
+            debug_dir = browser_engine.BROWSER_DATA_DIR / f"account_{self.account_id}"
+            debug_dir.mkdir(exist_ok=True)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            await self.page.screenshot(path=str(debug_dir / f"debug_{name}_{ts}.png"))
+            html = await self.page.content()
+            (debug_dir / f"debug_{name}_{ts}.html").write_text(html, encoding="utf-8")
+        except Exception:
+            pass
+
+    @staticmethod
+    def md_to_html(text: str) -> str:
+        """极简 Markdown → HTML（## 标题 / **加粗** / *斜体* / - 列表 / > 引用）
+
+        用于把 AI 生成的结构化文本以富文本形式粘贴进各平台的 ProseMirror 编辑器。
+        """
+        import html as _html
+        import re as _re
+        out, in_list, in_quote = [], False, False
+
+        def inline(s: str) -> str:
+            s = _html.escape(s)
+            s = _re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", s)
+            s = _re.sub(r"(^|[^*])\*([^*\n]+)\*", r"\1<em>\2</em>", s)
+            return s
+
+        def close():
+            nonlocal in_list, in_quote
+            if in_list:
+                out.append("</ul>")
+                in_list = False
+            if in_quote:
+                out.append("</blockquote>")
+                in_quote = False
+
+        for line in (text or "").split("\n"):
+            t = line.strip()
+            if not t:
+                close()
+                continue
+            hm = _re.match(r"^(#{1,4})\s+(.*)$", t)
+            if hm:
+                close()
+                lvl = max(2, min(4, len(hm.group(1)) + 1))
+                out.append(f"<h{lvl}>{inline(hm.group(2))}</h{lvl}>")
+                continue
+            if _re.match(r"^>\s?", t):
+                if not in_quote:
+                    close()
+                    out.append("<blockquote>")
+                    in_quote = True
+                out.append(f"<p>{inline(_re.sub(r'^>\s?', '', t))}</p>")
+                continue
+            if _re.match(r"^[-*·]\s+", t):
+                if not in_list:
+                    close()
+                    out.append("<ul>")
+                    in_list = True
+                out.append(f"<li>{inline(_re.sub(r'^[-*·]\s+', '', t))}</li>")
+                continue
+            close()
+            out.append(f"<p>{inline(t)}</p>")
+        close()
+        return "".join(out) or "<p></p>"
+
 
 # PlatformRisk 已移至 services/risk_control.py，避免循环导入

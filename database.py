@@ -11,6 +11,21 @@ _sqlite_kwargs = {"connect_args": {"timeout": 30}} if settings.DATABASE_URL.star
 engine = create_engine(settings.DATABASE_URL, echo=settings.DEBUG, **_sqlite_kwargs)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
+# SQLite 并发写加固：开启 WAL（读不阻塞写、写写排队）+ busy_timeout，
+# 避免 scheduler/Agent 与接口并发写时抛 "database is locked"
+if settings.DATABASE_URL.startswith("sqlite"):
+    from sqlalchemy import event
+
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragmas(dbapi_connection, _connection_record):
+        cur = dbapi_connection.cursor()
+        try:
+            cur.execute("PRAGMA journal_mode=WAL")
+            cur.execute("PRAGMA busy_timeout=30000")
+            cur.execute("PRAGMA synchronous=NORMAL")
+        finally:
+            cur.close()
+
 
 class Base(DeclarativeBase):
     """统一模型基类 — 提供 to_dict / to_public_dict"""

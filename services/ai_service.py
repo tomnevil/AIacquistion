@@ -1,6 +1,7 @@
 """AI 服务模块 — 客户评分、意向分析、话术生成"""
 import asyncio
 import json
+import re
 import httpx
 from config import settings
 from utils.logger import get_logger
@@ -13,37 +14,115 @@ class AIService:
 
     @staticmethod
     async def _call_ai(system_prompt: str, user_prompt: str) -> str:
-        """通用 AI 调用"""
+        """通用 AI 调用（空返回自动重试 1 次）"""
         if not settings.AI_API_KEY or settings.AI_API_KEY.startswith("your-"):
             return "[MOCK] AI服务未配置，请设置 .env 中的 AI_API_KEY"
 
-        try:
-            async with httpx.AsyncClient(timeout=settings.AI_TIMEOUT) as client:
-                resp = await client.post(
-                    f"{settings.AI_API_BASE}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {settings.AI_API_KEY}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": settings.AI_MODEL,
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                        "temperature": settings.AI_TEMPERATURE,
-                        "max_tokens": settings.AI_MAX_TOKENS,
-                    },
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                return data["choices"][0]["message"]["content"]
-        except httpx.HTTPStatusError as e:
-            logger.error(f"AI API HTTP {e.response.status_code}: {e.response.text[:200]}")
-            return f"[ERROR] AI API 返回 HTTP {e.response.status_code}"
-        except httpx.RequestError as e:
-            logger.error(f"AI API 请求失败: {e}")
-            return f"[ERROR] AI API 请求超时或网络错误"
+        for _ in range(2):
+            try:
+                async with httpx.AsyncClient(timeout=settings.AI_TIMEOUT) as client:
+                    resp = await client.post(
+                        f"{settings.AI_API_BASE}/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {settings.AI_API_KEY}",
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "model": settings.AI_MODEL,
+                            "messages": [
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": user_prompt},
+                            ],
+                            "temperature": settings.AI_TEMPERATURE,
+                            "max_tokens": settings.AI_MAX_TOKENS,
+                        },
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+                    message = data["choices"][0].get("message", {}) or {}
+                    # 兼容推理型模型：正文可能为空，回退取推理字段
+                    # （DeepSeek/GLM 用 reasoning，MiniMax 用 reasoning_content）
+                    content = (
+                        message.get("content")
+                        or message.get("reasoning")
+                        or message.get("reasoning_content")
+                        or ""
+                    ).strip()
+                    if content:
+                        return content
+            except httpx.HTTPStatusError as e:
+                logger.error(f"AI API HTTP {e.response.status_code}: {e.response.text[:200]}")
+                return f"[ERROR] AI API 返回 HTTP {e.response.status_code}"
+            except httpx.RequestError as e:
+                logger.error(f"AI API 请求失败: {e}")
+                return f"[ERROR] AI API 请求超时或网络错误"
+        logger.warning("AI 返回空内容，重试后仍为空")
+        return ""
+
+    @staticmethod
+    def _repair_json(s: str) -> str:
+        """修复常见的非法 JSON —— 主要是字符串值内未转义的英文双引号。
+
+        判定规则：处于字符串内遇到的 `"`，若其后第一个非空白字符属于
+        , : } ] 或已到结尾，则视为真正的结束引号，否则视为内容里的引号并转义。
+        """
+        out = []
+        in_str = False
+        esc = False
+        n = len(s)
+        for i, c in enumerate(s):
+            if in_str:
+                if esc:
+                    out.append(c)
+                    esc = False
+                elif c == "\\":
+                    out.append(c)
+                    esc = True
+                elif c == '"':
+                    j = i + 1
+                    while j < n and s[j] in " \t\r\n":
+                        j += 1
+                    nxt = s[j] if j < n else ""
+                    if nxt in ("", ",", ":", "}", "]"):
+                        out.append(c)
+                        in_str = False
+                    else:
+                        out.append('\\"')
+                else:
+                    out.append(c)
+            else:
+                out.append(c)
+                if c == '"':
+                    in_str = True
+        return "".join(out)
+
+    @staticmethod
+    def _extract_json(text: str):
+        """从模型输出中稳健地提取 JSON（兼容 ```json 围栏、前后多余文本、未转义引号）。
+
+        返回 dict / list，无法解析时返回 None。
+        """
+        if not text:
+            return None
+        t = text.strip()
+        # 去掉 markdown 代码围栏
+        t = re.sub(r"^```[a-zA-Z0-9_-]*\s*", "", t)
+        t = re.sub(r"\s*```$", "", t).strip()
+
+        candidates = [t]
+        # 截取最外层 {} 或 []
+        for open_ch, close_ch in (("{", "}"), ("[", "]")):
+            s, e = t.find(open_ch), t.rfind(close_ch)
+            if s != -1 and e > s:
+                candidates.append(t[s:e + 1])
+
+        for cand in candidates:
+            for attempt in (cand, AIService._repair_json(cand)):
+                try:
+                    return json.loads(attempt)
+                except Exception:
+                    continue
+        return None
 
     @staticmethod
     async def score_lead(lead: dict) -> dict:
@@ -73,9 +152,10 @@ class AIService:
                     "tags": "待评估,请配置API",
                     "summary": "AI服务未配置，使用默认评分"
                 }
-            # 移除可能的 markdown 代码块标记
-            result = result.strip().removeprefix("```json").removesuffix("```").strip()
-            return json.loads(result)
+            data = AIService._extract_json(result)
+            if isinstance(data, dict):
+                return data
+            raise ValueError(f"无法解析评分结果: {result[:80]}")
         except Exception as e:
             return {
                 "score": 50,

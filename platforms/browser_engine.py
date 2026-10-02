@@ -215,14 +215,21 @@ class BrowserEngine:
             cookie_file = user_dir / "cookies.json"
             if cookie_file.exists():
                 all_cookies = json.loads(cookie_file.read_text(encoding="utf-8"))
-                session_cookies = [
-                    c for c in all_cookies if c.get("expires", -1) == -1
+                # 只补「快照里有、当前 profile 里没有」的 cookie：
+                # - 恢复重启后丢失的会话 cookie
+                # - 恢复因浏览器非优雅退出而未落盘的持久 cookie（如知乎 z_c0）
+                # - 不覆盖 profile 中已轮换的新值
+                existing = await browser.cookies()
+                existing_keys = {(c.get("name"), c.get("domain", "")) for c in existing}
+                to_add = [
+                    c for c in all_cookies
+                    if (c.get("name"), c.get("domain", "")) not in existing_keys
                 ]
-                if session_cookies:
-                    await browser.add_cookies(session_cookies)
-                    print(f"[BrowserEngine] 账号 {account_id} 恢复 {len(session_cookies)} 个会话cookie")
+                if to_add:
+                    await browser.add_cookies(to_add)
+                    print(f"[BrowserEngine] 账号 {account_id} 恢复 {len(to_add)} 个 cookie(补缺失)")
         except Exception as e:
-            print(f"[BrowserEngine] 恢复会话cookie失败: {e}")
+            print(f"[BrowserEngine] 恢复cookie失败: {e}")
 
         self._contexts[account_id] = browser
         self._context_headless[account_id] = want_headless
@@ -336,6 +343,17 @@ class BrowserEngine:
             await page.keyboard.type(char, delay=random.randint(50, 200))
             if random.random() < 0.1:  # 10%概率停顿
                 await asyncio.sleep(random.uniform(0.3, 1.0))
+
+    @staticmethod
+    async def insert_text(page: Page, target, text: str):
+        """快速插入文本（一次性 insertText，不逐字模拟）——用于长文本（如文章正文）"""
+        if isinstance(target, str):
+            el = page.locator(target).first
+            await el.wait_for(state="visible", timeout=10000)
+        else:
+            el = target
+        await el.click()
+        await page.keyboard.insert_text(text)
 
     @staticmethod
     async def human_click(page: Page, target):
