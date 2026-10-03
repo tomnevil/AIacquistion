@@ -178,10 +178,11 @@ def attribute_full_chain(lead_id: int, db: Session = None) -> Dict[str, Any]:
                 PlatformTask.id == lead.attribution_task_id
             ).first()
             if task:
-                # 任务关联的内容（通过 final_content 模糊匹配 ContentLibrary.template）
+                # 任务关联的内容：走显式 ID（task.source_template_id → ContentLibrary.id）
+                # 旧逻辑用 final_content 与 template 文本等值，refine 过一次就断链（死路径）
                 content = db.query(ContentLibrary).filter(
-                    ContentLibrary.template == task.final_content
-                ).first()
+                    ContentLibrary.id == task.source_template_id
+                ).first() if task.source_template_id else None
                 if content:
                     lead.attribution_content_id = content.id
                     chain["content_id"] = content.id
@@ -193,9 +194,11 @@ def attribute_full_chain(lead_id: int, db: Session = None) -> Dict[str, Any]:
                 ContentLibrary.id == lead.attribution_content_id
             ).first()
             if content:
+                # 内容 → 选题：走 ContentLibrary.topic_id（TopicLibrary.id）
+                # 旧逻辑用 TopicLibrary.published_content 反推，而该字段从不写入（死路径）
                 topic = db.query(TopicLibrary).filter(
-                    TopicLibrary.published_content == content.template
-                ).first()
+                    TopicLibrary.id == content.topic_id
+                ).first() if content.topic_id else None
                 if topic:
                     lead.attribution_topic_id = topic.id
                     chain["topic_id"] = topic.id

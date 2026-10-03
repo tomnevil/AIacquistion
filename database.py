@@ -279,6 +279,9 @@ class ContentLibrary(Base):
     status = Column(String(20), default="active")  # active / draft / rejected / archived
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # P2 子任务4：归因改走 ID 关联 — 该内容来自哪个选题（TopicLibrary.id）
+    topic_id = Column(Integer, nullable=True, index=True)
+
     # P1-7: 版本管理
     version = Column(Integer, default=1)                       # 当前版本号
     changed_by = Column(Integer, nullable=True)                # 最后修改人 ID
@@ -1295,6 +1298,25 @@ def init_db():
                 _ensure_column(db, table, col, dtype)
             except Exception:
                 db.rollback()
+
+        # ── P2 子任务4：内容 → 选题 的显式 ID 关联（归因不再走文本匹配）──
+        for table, col, dtype in [
+            ("content_library", "topic_id", "INTEGER"),
+        ]:
+            try:
+                _ensure_column(db, table, col, dtype)
+            except Exception:
+                db.rollback()
+        # 旧库没有 create_all 建的索引，这里补一个幂等索引，与 ORM 的 index=True 对齐
+        try:
+            db.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_content_library_topic_id "
+                "ON content_library(topic_id)"
+            ))
+            db.commit()
+        except Exception as e:
+            print(f"[db migration] 创建 content_library.topic_id 索引失败: {e}")
+            db.rollback()
 
         # ── PRD 第二期扩展：线索旅程 / 热点选题 / 内容效果 ──
         for table, col, dtype in [

@@ -1004,6 +1004,7 @@ class SaveToLibraryRequest(BaseModel):
     platform: str = ""
     category: str = ""
     tags: str = ""
+    topic_id: Optional[int] = None  # P2 子任务4：来源选题，供归因走 ID 关联
 
 
 @router.post("/accounts/{account_id}/publish/save-to-library")
@@ -1036,9 +1037,19 @@ def save_publish_to_library(
     except Exception as e:
         raise HTTPException(500, f"存入素材库失败: {str(e)}")
 
+    # P2 子任务4：写入来源选题 ID，让「内容 → 选题」的归因有显式关联可走
+    if req.topic_id:
+        try:
+            t.topic_id = req.topic_id
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(500, f"写入选题关联失败: {str(e)}")
+
     return {
         "success": True,
         "template_id": t.id,
+        "topic_id": t.topic_id,
         "status": t.status,
         "message": "已存入素材库（草稿）",
     }

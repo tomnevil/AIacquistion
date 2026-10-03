@@ -4786,6 +4786,7 @@ async function saveToLibrary(){
         content: content,
         title: content.trim().split('\n')[0].slice(0, 80),
         tags: '工作台存入',
+        topic_id: _currentTopicId,  // 来自选题库的上下文，没有则为 null
       })
     });
     toast('已存入素材库（草稿，模板 #'+res.template_id+'）', 'success');
@@ -6400,6 +6401,8 @@ updateInboxBadge();  // 页面加载后立即检查一次
 var _editTopicId = null, selectedTopics = new Set();
 // 选题行缓存：供「✍️ 去创作」按 id 取标题，避免把标题塞进 onclick 里的转义问题
 var _topicRows = {};
+// 工作台当前的选题上下文（由「✍️ 去创作」写入），存入素材库时带上，供归因走 ID 关联
+var _currentTopicId = null;
 
 async function loadTopics(){
   var pf = (document.getElementById('topicPlatformF')?.value)||'';
@@ -6445,6 +6448,7 @@ function createFromTopic(id){
   if(!title){ toast('该选题没有标题，无法载入', 'error'); return; }
   var input = document.getElementById('publishTopic');
   if(input){ input.value = title; }
+  _currentTopicId = id;  // 记录选题上下文，存入素材库时写进 ContentLibrary.topic_id
   // 先切 tab（切换时内部会重置为步骤1），再推进到步骤2
   switchTabSidebar('publish');
   if(input){ input.focus(); }

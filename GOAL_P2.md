@@ -95,11 +95,11 @@
 - **`TopicLibrary.published_content` 不再作为归因依据**（可保留字段不删，但归因不走它）
 
 **完成判据**：
-- [ ] `ContentLibrary` ORM 模型含 `topic_id` 字段
-- [ ] `init_db()` 含运行时 ALTER 补列逻辑（PRAGMA 检测 + ALTER ADD COLUMN），幂等
-- [ ] `attribution_service.py:183` 附近改为 `ContentLibrary.id == task.source_template_id`（不再文本等值）
-- [ ] `attribution_service.py:197` 附近改为 `TopicLibrary.id == content.topic_id`（不再用 published_content）
-- [ ] `TopicLibrary.published_content` 字段保留但归因不再依赖它
+- [x] `ContentLibrary` ORM 模型含 `topic_id` 字段
+- [x] `init_db()` 含运行时 ALTER 补列逻辑（PRAGMA 检测 + ALTER ADD COLUMN），幂等
+- [x] `attribution_service.py:183` 附近改为 `ContentLibrary.id == task.source_template_id`（不再文本等值）
+- [x] `attribution_service.py:197` 附近改为 `TopicLibrary.id == content.topic_id`（不再用 published_content）
+- [x] `TopicLibrary.published_content` 字段保留但归因不再依赖它
 
 ---
 
