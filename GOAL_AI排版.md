@@ -53,13 +53,13 @@
 - 现有 5 种元素保持不变（零回归）
 
 **完成判据**：
-- [ ] `---`/`***` 渲染为 `<hr>`
-- [ ] `1. ` 渲染为 `<ol><li>` 有序列表
-- [ ] Markdown 表格渲染为 `<table>`
-- [ ] `` `code` `` 渲染为 `<code>`
-- [ ] ` ```code block``` ` 渲染为 `<pre><code>`
-- [ ] `![alt](url)` 渲染为带 class 的 `<img>`
-- [ ] 现有 5 种元素（标题/加粗/斜体/无序列表/引用）渲染不变（零回归）
+- [x] `---`/`***` 渲染为 `<hr>`
+- [x] `1. ` 渲染为 `<ol><li>` 有序列表
+- [x] Markdown 表格渲染为 `<table>`
+- [x] `` `code` `` 渲染为 `<code>`
+- [x] ` ```code block``` ` 渲染为 `<pre><code>`
+- [x] `![alt](url)` 渲染为带 class 的 `<img>`
+- [x] 现有 5 种元素（标题/加粗/斜体/无序列表/引用）渲染不变（零回归）
 
 ### 子任务2：AI 生成时的智能排版指令（prompt 升级）
 **问题**：content_generation_service.py:109 的 structured prompt 只要求 5 种基础元素，AI 不会主动用高级排版。
@@ -98,11 +98,11 @@
 - 现有 `structured=False`（Agent 短内容）路径保持原行为不变（零回归）
 
 **完成判据**：
-- [ ] content_generation_service.py 含两套排版指令（小红书系 / 深度文系）
-- [ ] generate_content 按 platform 选排版指令
-- [ ] 小红书系指令含 emoji 节奏/呼吸感/emoji列表/金句引用
-- [ ] 深度文系指令含分割线/有序列表/层级标题/代码块/表格
-- [ ] `structured=False` 路径行为不变（零回归）
+- [x] content_generation_service.py 含两套排版指令（小红书系 / 深度文系）
+- [x] generate_content 按 platform 选排版指令
+- [x] 小红书系指令含 emoji 节奏/呼吸感/emoji列表/金句引用
+- [x] 深度文系指令含分割线/有序列表/层级标题/代码块/表格
+- [x] `structured=False` 路径行为不变（零回归）
 
 ### 子任务3：预览样式升级（CSS + Quill 工具栏）
 **问题**：预览区 CSS（index.html:640-647）样式简陋，新元素无样式；Quill 工具栏可能缺对应按钮。
@@ -121,18 +121,18 @@
 - 检查 Quill 工具栏配置，若缺有序列表/代码等按钮则补上（仅限 Quill 已配置工具栏的情况；若用纯 contenteditable 则跳过）
 
 **完成判据**：
-- [ ] `<hr>` 有样式（渐变/间距）
-- [ ] `<table>` 有样式（边框/斑马纹/表头）
-- [ ] `<pre><code>` 有样式（深色背景/圆角）
-- [ ] `<img>` 有样式（圆角/阴影/居中）
-- [ ] blockquote 样式升级（色条+浅背景）
-- [ ] 段落间距有呼吸感
-- [ ] 标题层级视觉分级清晰
+- [x] `<hr>` 有样式（渐变/间距）
+- [x] `<table>` 有样式（边框/斑马纹/表头）
+- [x] `<pre><code>` 有样式（深色背景/圆角）
+- [x] `<img>` 有样式（圆角/阴影/居中）
+- [x] blockquote 样式升级（色条+浅背景）
+- [x] 段落间距有呼吸感
+- [x] 标题层级视觉分级清晰
 
 ---
 
 ## 整体完成判据（Goal 达成条件）
-- 上述 3 个子任务所有 `[ ]` 完成判据全部打勾
+- 上述 3 个子任务所有 `[x]` 完成判据全部打勾
 - `AI排版_CHANGELOG.md` 已生成
 - 改动的 .py 文件 ast.parse 通过；index.html node --check 通过
 - `pytest tests/ -q` 通过（或记录跑不动的原因）

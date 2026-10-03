@@ -646,6 +646,25 @@ a:hover { text-decoration:underline; }
 #publishPreviewArea a { color:var(--primary); }
 #publishPreviewArea .preview-badge { display:inline-block; background:#FEF3C7; color:#92400E; font-size:10px; padding:2px 8px; border-radius:3px; margin-bottom:8px; }
 
+/* ── AI 智能排版：预览区 + 编辑器内元素样式（对标小红书/公众号爆款文） ── */
+#publishPreviewArea hr, .ql-editor hr { border:none; height:1px; margin:20px 0; background:linear-gradient(90deg, transparent, rgba(99,102,241,0.45), transparent); }
+#publishPreviewArea table, .ql-editor table { width:100%; border-collapse:collapse; margin:12px 0; font-size:13px; }
+#publishPreviewArea th, .ql-editor th, #publishPreviewArea td, .ql-editor td { border:1px solid var(--border); padding:7px 10px; }
+#publishPreviewArea th, .ql-editor th { background:#F5F7FF; font-weight:700; text-align:left; }
+#publishPreviewArea tbody tr:nth-child(even), .ql-editor tbody tr:nth-child(even) { background:#FAFBFC; }
+#publishPreviewArea pre, .ql-editor pre { background:#1E293B; color:#E2E8F0; border-radius:8px; padding:12px 14px; margin:12px 0; overflow-x:auto; font-family:'Consolas','Monaco','Courier New',monospace; font-size:12px; line-height:1.65; }
+#publishPreviewArea pre code, .ql-editor pre code { background:none; color:inherit; padding:0; font-size:12px; }
+#publishPreviewArea code, .ql-editor code { background:#F1F5F9; color:#BE185D; border-radius:4px; padding:1px 5px; font-family:'Consolas','Monaco','Courier New',monospace; font-size:12px; }
+#publishPreviewArea img, .ql-editor img { display:block; max-width:100%; height:auto; margin:14px auto; border-radius:10px; box-shadow:0 4px 16px rgba(15,23,42,0.12); }
+#publishPreviewArea ol, .ql-editor ol { padding-left:22px; margin:8px 0; }
+#publishPreviewArea ul, .ql-editor ul { padding-left:20px; margin:8px 0; }
+#publishPreviewArea li, .ql-editor li { margin:4px 0; line-height:1.75; }
+#publishPreviewArea blockquote, .ql-editor blockquote { border-left:4px solid var(--primary); background:#F7F9FF; padding:10px 14px; margin:14px 0; border-radius:0 8px 8px 0; color:var(--text); font-style:italic; }
+#publishPreviewArea p, .ql-editor p { margin:9px 0; line-height:1.8; }
+#publishPreviewArea h2, .ql-editor h2 { font-size:19px; font-weight:800; margin:22px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+#publishPreviewArea h3, .ql-editor h3 { font-size:16px; font-weight:700; margin:16px 0 8px; }
+#publishPreviewArea h4, .ql-editor h4 { font-size:14px; font-weight:700; margin:14px 0 6px; color:var(--text2); }
+
 /* ── 收件箱 ── */
 .inbox-unread-row td { font-weight:500; background:#FFFBEB; }
 #inboxBadge { animation:pulse-badge 2s ease-in-out infinite; }
@@ -4867,20 +4886,81 @@ async function doPublishExecute(){
 // ── 简易 Markdown → Quill HTML（支持 ## 标题 / **加粗** / *斜体* / - 列表 / > 引用） ──
 function mdToQuillHtml(txt){
   var lines = (txt || '').split('\n');
-  var html = '', inList = false, inQuote = false;
+  var html = '', inList = false, listTag = '', inQuote = false;
+  var inCode = false, codeBuf = [], codeLang = '';
+
+  function closeList(){
+    if (inList){ html += '</' + listTag + '>'; inList = false; listTag = ''; }
+  }
   function closeBlocks(){
-    if (inList){ html += '</ul>'; inList = false; }
+    closeList();
     if (inQuote){ html += '</blockquote>'; inQuote = false; }
   }
+  function flushCode(){
+    html += '<pre><code' + (codeLang ? ' class="language-' + esc(codeLang) + '"' : '') + '>'
+          + esc(codeBuf.join('\n')) + '</code></pre>';
+    inCode = false; codeBuf = []; codeLang = '';
+  }
+  // 行内：图片 / 行内代码 / 加粗 / 斜体（顺序不能反：先 esc，再按特异性从高到低替换）
   function inline(s){
     s = esc(s);
+    s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g,
+      function(m, alt, src){ return '<img class="md-img" src="' + src + '" alt="' + alt + '">'; });
+    s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
     s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
     return s;
   }
+  function cells(row){
+    return row.replace(/^\||\|$/g, '').split('|').map(function(c){ return inline(c.trim()); });
+  }
+
   for (var i = 0; i < lines.length; i++){
-    var t = lines[i].trim();
+    var raw = lines[i];
+    var t = raw.trim();
+
+    // 1. 围栏代码块：内部原样保留（不做行内解析），未闭合的围栏也要输出
+    if (inCode){
+      if (/^```\s*$/.test(t)) flushCode(); else codeBuf.push(raw);
+      continue;
+    }
+    var fence = t.match(/^```(\w*)\s*$/);
+    if (fence){
+      closeBlocks(); inCode = true; codeLang = fence[1] || ''; codeBuf = [];
+      continue;
+    }
+
     if (!t){ closeBlocks(); continue; }
+
+    // 2. 分割线 --- / *** / ___
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(t)){
+      closeBlocks(); html += '<hr>'; continue;
+    }
+
+    // 3. Markdown 表格（首行为表头，跳过 |---| 分隔行）
+    if (/^\|.*\|$/.test(t)){
+      var rows = [];
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])){ rows.push(lines[i].trim()); i++; }
+      i--;  // for 循环还会 +1，回退一格
+      rows = rows.filter(function(r, idx){ return !(idx === 1 && /^\|[\s:|-]+\|$/.test(r)); });
+      if (rows.length){
+        closeBlocks();
+        html += '<table><thead><tr>'
+              + cells(rows[0]).map(function(c){ return '<th>' + c + '</th>'; }).join('')
+              + '</tr></thead>';
+        if (rows.length > 1){
+          html += '<tbody>'
+                + rows.slice(1).map(function(r){
+                    return '<tr>' + cells(r).map(function(c){ return '<td>' + c + '</td>'; }).join('') + '</tr>';
+                  }).join('')
+                + '</tbody>';
+        }
+        html += '</table>';
+      }
+      continue;
+    }
+
+    // 4. 标题（原有行为不变：# → h2，## → h3，### → h4）
     var hm = t.match(/^(#{1,4})\s+(.*)$/);
     if (hm){
       closeBlocks();
@@ -4888,19 +4968,29 @@ function mdToQuillHtml(txt){
       html += '<' + tag + '>' + inline(hm[2]) + '</' + tag + '>';
       continue;
     }
+    // 5. 引用（原有行为不变）
     if (/^>\s?/.test(t)){
       if (!inQuote){ closeBlocks(); html += '<blockquote>'; inQuote = true; }
       html += '<p>' + inline(t.replace(/^>\s?/, '')) + '</p>';
       continue;
     }
+    // 6. 有序列表 1. / 1)
+    var om = t.match(/^\d+[.)]\s+(.*)$/);
+    if (om){
+      if (!inList || listTag !== 'ol'){ closeList(); html += '<ol>'; inList = true; listTag = 'ol'; }
+      html += '<li>' + inline(om[1]) + '</li>';
+      continue;
+    }
+    // 7. 无序列表（原有行为不变）
     if (/^[-*·]\s+/.test(t)){
-      if (!inList){ closeBlocks(); html += '<ul>'; inList = true; }
+      if (!inList || listTag !== 'ul'){ closeList(); html += '<ul>'; inList = true; listTag = 'ul'; }
       html += '<li>' + inline(t.replace(/^[-*·]\s+/, '')) + '</li>';
       continue;
     }
     closeBlocks();
     html += '<p>' + inline(t) + '</p>';
   }
+  if (inCode) flushCode();
   closeBlocks();
   return html || '<p></p>';
 }
@@ -5355,7 +5445,8 @@ function initPublishEditor(cb){
     placeholder: '在此编辑或粘贴发布内容...',
     modules: {
       toolbar: [
-        ['bold', 'italic', 'underline', 'strike'],
+        // 'code'=行内代码（AI 智能排版新增），code-block 为代码块
+        ['bold', 'italic', 'underline', 'strike', 'code'],
         [{ 'list': 'ordered'}, { 'list': 'bullet' }],
         ['blockquote', 'code-block'],
         [{ 'header': [1, 2, 3, false] }],

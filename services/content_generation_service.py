@@ -17,6 +17,37 @@ from services.content_strategy import PLATFORM_STYLES
 # 候选分隔符：全项目仅此一处定义，工作台与 Agent 共用
 CANDIDATE_SPLIT = "<<<CANDIDATE_SPLIT>>>"
 
+# ── 排版范式（对标小红书/公众号爆款文）：按平台分两套 ──
+# 小红书系：短内容、强节奏、emoji 驱动；平台不支持代码块/表格/分割线
+CASUAL_LAYOUT_PLATFORMS = {"xiaohongshu", "douyin", "weibo"}
+
+LAYOUT_CASUAL = """排版要求（小红书爆款风）：
+- 标题单独一行，吸睛带情绪
+- 每 2-3 句分段，段间空行，保持呼吸感
+- 小节标题用 ## 并带 1 个 emoji（如 ## ✨ 核心方法）
+- 重点用 **加粗**
+- 分点用 emoji 列表（✅/📌/💡/🔥），不用纯 -
+- 金句用 > 引用框突出
+- 结尾互动引导带 emoji
+- 不要用代码块、表格、分割线（小红书不支持）"""
+
+LAYOUT_DEEP = """排版要求（深度好文风）：
+- 开头单独一行给吸引人的标题
+- 主章节用 ## ，子要点用 ###
+- 长文用 --- 分割线分章
+- 数据/步骤用有序列表 1. 2. 3.
+- 要点可用 - 无序列表
+- 金句/结论用 > 引用框 + **加粗**
+- 重点用 **加粗**
+- 段落不堆大段，2-4 句一段
+- 技术内容可用 `代码` 和 ```代码块```
+- 表格用 Markdown 表格语法"""
+
+
+def _layout_instruction(platform: str) -> str:
+    """按平台返回对应排版指令：小红书系走短内容爆款风，其余走深度好文风"""
+    return LAYOUT_CASUAL if platform in CASUAL_LAYOUT_PLATFORMS else LAYOUT_DEEP
+
 # 模型偶尔会把英文思考过程吐进正文，这里按"英文开头且中文很少"识别并剔除
 _REASONING_RE = re.compile(r"^\s*(The user|Let me|I need|I should|Okay|Sure|First)")
 _CN_RE = re.compile(r"[\u4e00-\u9fff]")
@@ -105,10 +136,8 @@ async def generate_content(account: Any, topic: str = "", **opts) -> List[str]:
     if opts.get("custom_prompt"):
         extra.append("用户自定义要求: " + opts["custom_prompt"])
     if opts.get("structured", True):
-        extra.append(
-            "排版要求：使用结构化排版——开头单独一行给一个吸引人的标题；小节用 '## 小节标题'；"
-            "重点用 **加粗**；要点用 '- ' 列表；金句/总结用 '> ' 引用。"
-        )
+        # 平台化排版指令：小红书系 / 深度文系两套爆款范式
+        extra.append(_layout_instruction(platform))
     for rule in opts.get("extra_rules") or []:
         extra.append(rule)
     if extra:
