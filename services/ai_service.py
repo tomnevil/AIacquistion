@@ -213,12 +213,59 @@ AI评分: {lead.get('ai_score', '未评分')}分"""
         user = f"以下是{len(leads_data)}条潜在客户数据:\n{json.dumps(leads_data[:10], ensure_ascii=False)}"
         return await AIService._call_ai(system, user)
 
+    # 视频脚本的 JSON 约定（三处生成共用，避免各处手写不一致）
+    VIDEO_SCRIPT_KEYS = (
+        '{"title": "视频标题", "scenes": [{"time": "0-5s", "visual": "画面描述", '
+        '"script": "口播文案"}, ...], "tags": ["标签1", ...], "suggestion": "拍摄建议"}'
+    )
+
     @staticmethod
-    async def generate_video_script(topic: str, style: str, duration: int, platform: str = "") -> dict:
-        """生成短视频脚本（分镜 + 口播文案 + 标签建议）"""
-        system = """你是短视频脚本创作专家。请根据主题、风格、时长和目标平台生成脚本。
-请用JSON返回：{"title": "视频标题", "scenes": [{"time": "0-5s", "visual": "画面描述", "script": "口播文案"}, ...], "tags": ["标签1", ...], "suggestion": "拍摄建议"}"""
+    def _outline_block(outline: str) -> str:
+        """把用户编辑过的分镜大纲拼成 prompt 片段（每行一个分镜）"""
+        outline = (outline or "").strip()
+        if not outline:
+            return ""
+        return "\n\n严格按以下分镜大纲展开（每行一个分镜，顺序不可调整）:\n" + outline
+
+    @staticmethod
+    async def generate_video_outline(
+        topic: str, style: str = "轻松口播", duration: int = 15, platform: str = "", scenes: int = 5
+    ) -> list:
+        """生成分镜大纲（供用户编辑后再生成完整脚本），返回 [{scene_title, key_points}, ...]"""
+        n = max(2, min(10, scenes or 5))
+        system = f"""你是短视频分镜策划专家，要为{platform or '通用'}平台的短视频设计分镜大纲。
+只输出 JSON，格式：
+{{"outline": [{{"scene_title": "分镜标题", "key_points": "该分镜要点"}}]}}
+outline 共 {n} 个分镜，按短视频节奏递进（钩子开场 → 内容展开 → 高潮/转折 → 收尾引导）。
+总时长约 {duration} 秒，风格：{style}。不要输出 JSON 以外的任何文字。"""
         user = f"主题：{topic}\n风格：{style}\n时长：{duration}秒\n平台：{platform or '通用'}"
+        result = await AIService._call_ai(system, user)
+        if "[MOCK]" in result or not result:
+            return [
+                {"scene_title": "钩子开场", "key_points": "3 秒内抛出痛点或反常识结论"},
+                {"scene_title": "核心内容", "key_points": "展开 2-3 个要点，配合画面演示"},
+                {"scene_title": "收尾引导", "key_points": "总结 + 引导点赞关注"},
+            ]
+        data = AIService._extract_json(result)
+        if isinstance(data, dict) and isinstance(data.get("outline"), list):
+            return data["outline"]
+        if isinstance(data, list):
+            return data
+        logger.warning(f"分镜大纲解析失败，返回空大纲: {result[:120]}")
+        return []
+
+    @staticmethod
+    async def generate_video_script(
+        topic: str, style: str, duration: int, platform: str = "", outline: str = ""
+    ) -> dict:
+        """生成短视频脚本（分镜 + 口播文案 + 标签建议）
+
+        outline 非空时，分镜严格按该大纲展开（大纲由 generate_video_outline 产出并经用户编辑）。
+        """
+        system = f"""你是短视频脚本创作专家。请根据主题、风格、时长和目标平台生成脚本。
+请用JSON返回：{AIService.VIDEO_SCRIPT_KEYS}"""
+        user = (f"主题：{topic}\n风格：{style}\n时长：{duration}秒\n平台：{platform or '通用'}"
+                + AIService._outline_block(outline))
         result = await AIService._call_ai(system, user)
         if "[MOCK]" in result:
             return {
@@ -231,14 +278,63 @@ AI评分: {lead.get('ai_score', '未评分')}分"""
                 "tags": [topic, "短视频", "AI创作"],
                 "suggestion": "未配置 AI API，使用示例脚本",
             }
-        try:
-            result = result.strip().removeprefix("```json").removesuffix("```").strip()
-            data = json.loads(result)
-            if isinstance(data, dict):
-                return data
-        except Exception:
-            pass
+        # P1 的健壮解析：兼容 ```json 围栏、前后多余文本、字符串内未转义引号
+        data = AIService._extract_json(result)
+        if isinstance(data, dict):
+            return data
+        logger.warning(f"视频脚本解析失败: {result[:120]}")
         return {"title": topic, "scenes": [], "tags": [], "suggestion": result[:300]}
+
+    @staticmethod
+    async def generate_video_script_candidates(
+        topic: str, style: str, duration: int, platform: str = "", outline: str = "", count: int = 3
+    ) -> list:
+        """一次生成多个候选脚本（对应文章工作台的 3 候选），返回脚本 dict 列表"""
+        n = max(1, min(5, count or 3))
+        system = f"""你是短视频脚本创作专家。请为同一需求生成 {n} 个**风格差异化**的候选脚本。
+请用JSON返回：{{"candidates": [{AIService.VIDEO_SCRIPT_KEYS}, ...]}}
+共 {n} 个候选，每个候选必须是独立完整的脚本；差异体现在切入角度、节奏和口播语气上。
+不要输出 JSON 以外的任何文字。"""
+        user = (f"主题：{topic}\n风格：{style}\n时长：{duration}秒\n平台：{platform or '通用'}"
+                + AIService._outline_block(outline))
+        result = await AIService._call_ai(system, user)
+
+        data = AIService._extract_json(result)
+        if isinstance(data, dict) and isinstance(data.get("candidates"), list):
+            items = [c for c in data["candidates"] if isinstance(c, dict)]
+            if items:
+                return items[:n]
+
+        # 兜底：整包解析失败时退回单脚本生成，保证接口始终返回 1 个可用候选
+        logger.warning(f"视频脚本候选解析失败，退回单脚本生成: {result[:120]}")
+        single = await AIService.generate_video_script(topic, style, duration, platform, outline)
+        return [single]
+
+    @staticmethod
+    async def refine_video_script(script: dict, instruction: str, selection: str = "") -> dict:
+        """AI 微调视频脚本：selection 非空则只改该分镜，其余原样照抄"""
+        instruction = (instruction or "").strip()
+        if not instruction:
+            return script
+        selection = (selection or "").strip()
+        if selection:
+            rule = (f"\n本次只改写下面这个分镜，输出中其余分镜必须逐字原样照抄，"
+                    f"不得改写、不得删减、不得调整顺序：\n【待改写分镜】\n{selection}")
+        else:
+            rule = "\n本次为整篇微调，可整体改写，但必须保留分镜结构。"
+
+        system = (f"""你是短视频脚本编辑。按用户的修改指令改写脚本。
+请用JSON返回改写后的完整脚本，格式：{AIService.VIDEO_SCRIPT_KEYS}
+要求：{rule}
+不要输出 JSON 以外的任何文字。""")
+        user = f"【原始脚本】\n{json.dumps(script, ensure_ascii=False)}\n\n【修改指令】\n{instruction}"
+        result = await AIService._call_ai(system, user)
+
+        data = AIService._extract_json(result)
+        if isinstance(data, dict) and isinstance(data.get("scenes"), list):
+            return data
+        logger.warning(f"视频脚本微调解析失败，保留原脚本: {result[:120]}")
+        return script
 
 
 # 单例

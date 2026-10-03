@@ -2744,27 +2744,47 @@ a:hover { text-decoration:underline; }
           <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">目标平台（可选）</label>
           <select id="videoPlatform" style="width:100%;max-width:300px;padding:9px 14px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:13px;background:#fff"><option value="">通用</option></select>
         </div>
+        <!-- 分镜大纲区（参考 P1b 大纲卡片：可编辑增删，序列化后回传后端） -->
+        <div style="margin-top:14px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;font-weight:600">分镜大纲（可选，可编辑增删）</label>
+            <button class="btn btn-sm" onclick="generateVideoOutline()" id="btnVideoOutline" style="font-size:12px">✨ AI 生成分镜大纲</button>
+          </div>
+          <div id="videoOutlineCards" style="margin-top:8px"></div>
+          <button class="btn btn-sm" onclick="addVideoScene()" style="margin-top:6px;font-size:12px">➕ 添加分镜</button>
+          <div style="font-size:11px;color:var(--text2);margin-top:6px">留空则 AI 自由发挥；填写后脚本会严格按大纲顺序展开</div>
+        </div>
+
         <button class="btn btn-lg" onclick="generateVideoScript()" style="margin-top:16px;background:var(--purple-gradient);color:#fff;border:none;padding:12px 28px;font-size:14px;font-weight:700;border-radius:var(--radius-sm);box-shadow:0 4px 16px rgba(99,102,241,0.3);cursor:pointer">🤖 AI 生成视频脚本</button>
         <div id="videoScriptResult" style="margin-top:16px"></div>
       </div>
       <div id="videoUploadSection" style="display:none;margin-top:16px">
         <div class="panel-card" style="padding:20px">
-          <h4 style="margin:0 0 14px;font-size:13px">📤 发布设置</h4>
+          <h4 style="margin:0 0 14px;font-size:13px">📁 本地视频</h4>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-            <div>
-              <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">视频链接</label>
-              <input type="text" id="videoUrl" placeholder="https://..." style="width:100%;padding:10px 14px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:13px">
-            </div>
             <div>
               <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">标题</label>
               <input type="text" id="videoTitle" style="width:100%;padding:10px 14px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:13px">
             </div>
+            <div>
+              <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">关联账号</label>
+              <select id="videoAccountSelect" style="width:100%;padding:9px 14px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:13px;background:#fff"></select>
+            </div>
           </div>
-          <div style="margin-top:14px">
-            <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">发布账号</label>
-            <select id="videoAccountSelect" style="width:100%;max-width:300px;padding:9px 14px;border:1.5px solid rgba(148,163,184,0.3);border-radius:var(--radius-sm);font-size:13px;background:#fff"></select>
+          <input type="file" id="videoFileInput" accept="video/*" style="display:none" onchange="uploadVideoFile(this)">
+          <button class="btn btn-lg" onclick="document.getElementById('videoFileInput').click()" id="btnUploadVideo" style="margin-top:14px;padding:10px 22px;font-size:13px">📤 上传本地视频</button>
+          <div style="font-size:11px;color:var(--text2);margin-top:6px">支持 mp4/mov/avi/webm/mkv，单个 ≤ 500MB</div>
+          <div id="videoPreviewBox" style="margin-top:12px"></div>
+          <div id="videoUploadMsg" style="font-size:12px;color:var(--text2);margin-top:6px"></div>
+        </div>
+        <div class="panel-card" style="padding:20px;margin-top:12px">
+          <h4 style="margin:0 0 14px;font-size:13px">📦 导出发布包（手动发布）</h4>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-lg" onclick="downloadVideoFile()" style="padding:10px 18px;font-size:13px">📥 下载视频</button>
+            <button class="btn btn-lg" onclick="copyVideoPublishText()" style="padding:10px 18px;font-size:13px">📋 复制发布文案</button>
+            <button class="btn btn-lg" onclick="copyVideoSceneScript()" style="padding:10px 18px;font-size:13px">📋 复制分镜脚本</button>
           </div>
-          <button class="btn btn-green btn-lg" onclick="submitVideoPublish()" style="margin-top:16px;padding:12px 28px">提交发布</button>
+          <div style="font-size:11px;color:var(--text2);margin-top:8px">本工坊不自动发平台：下载视频 + 复制文案后，请到目标平台手动发布</div>
         </div>
       </div>
       <div id="videoResult" style="margin-top:12px"></div>
@@ -7447,6 +7467,164 @@ async function loadVideoAccounts(){
   } catch(e){ console.error('video accounts', e); }
 }
 
+/* ══════════════════════════════════════════
+   视频工坊：分镜大纲 / 脚本候选 / 微调 / 上传 / 导出
+   ══════════════════════════════════════════ */
+var _videoOutlineScenes = [];   // [{scene_title, key_points}]
+var _videoCandidates = [];      // 候选脚本列表
+var _videoSelected = 0;         // 当前选中的候选下标
+var _currentVideoUrl = '';      // 已上传的本地视频 url（导出用）
+
+// ── 分镜大纲卡片（参考 P1b 大纲卡片）──
+function renderVideoOutlineCards(){
+  var box = document.getElementById('videoOutlineCards');
+  if (!box) return;
+  if (!_videoOutlineScenes.length){
+    box.innerHTML = '<div style="font-size:12px;color:var(--text2);padding:8px 0">点「✨ AI 生成分镜大纲」或「➕ 添加分镜」开始</div>';
+    return;
+  }
+  box.innerHTML = _videoOutlineScenes.map(function(s, i){
+    return '<div class="video-scene" style="display:flex;gap:8px;align-items:flex-start;background:#fff">'+
+      '<span style="font-size:11px;color:var(--primary);font-weight:700;padding-top:8px">'+(i+1)+'</span>'+
+      '<input type="text" value="'+esc(s.scene_title||'')+'" placeholder="分镜标题" onchange="updateVideoSceneField('+i+',\'scene_title\',this.value)" style="flex:1;padding:7px 10px;border:1.5px solid rgba(148,163,184,0.25);border-radius:6px;font-size:12px">'+
+      '<input type="text" value="'+esc(s.key_points||'')+'" placeholder="该分镜要点" onchange="updateVideoSceneField('+i+',\'key_points\',this.value)" style="flex:2;padding:7px 10px;border:1.5px solid rgba(148,163,184,0.25);border-radius:6px;font-size:12px">'+
+      '<button class="btn btn-sm btn-red" onclick="removeVideoScene('+i+')" title="删除该分镜">🗑</button>'+
+      '</div>';
+  }).join('');
+}
+function addVideoScene(){
+  _videoOutlineScenes.push({scene_title:'', key_points:''});
+  renderVideoOutlineCards();
+}
+function removeVideoScene(i){
+  _videoOutlineScenes.splice(i, 1);
+  renderVideoOutlineCards();
+}
+function updateVideoSceneField(i, field, value){
+  if (_videoOutlineScenes[i]) _videoOutlineScenes[i][field] = value;
+}
+// 序列化成后端 outline 文本（每行一个分镜）
+function serializeVideoOutline(){
+  return _videoOutlineScenes
+    .filter(function(s){ return (s.scene_title||'').trim() || (s.key_points||'').trim(); })
+    .map(function(s, i){ return (i+1)+' '+((s.scene_title||'').trim())+'：'+((s.key_points||'').trim()); })
+    .join('\n');
+}
+
+async function generateVideoOutline(){
+  var topic = document.getElementById('videoTopic').value.trim();
+  if (!topic) return toast('请先填写视频主题','error');
+  var btn = document.getElementById('btnVideoOutline');
+  if (btn) { btn.disabled = true; btn.textContent = '生成中...'; }
+  try {
+    var res = await apiFetch(PAPI+'/video/outline', {method:'POST', body:JSON.stringify({
+      topic: topic,
+      style: document.getElementById('videoStyle').value || '轻松口播',
+      duration: parseInt(document.getElementById('videoDuration').value) || 15,
+      platform: document.getElementById('videoPlatform').value || '',
+      scenes: 5
+    })});
+    var list = res.outline || [];
+    if (!list.length) return toast('大纲生成失败，请重试','error');
+    _videoOutlineScenes = list.map(function(s){
+      return {scene_title: s.scene_title || '', key_points: s.key_points || ''};
+    });
+    renderVideoOutlineCards();
+    toast('分镜大纲已生成（'+_videoOutlineScenes.length+' 个），可增删改后再生成脚本','success');
+  } catch(e){ toast('分镜大纲生成失败','error'); }
+  if (btn) { btn.disabled = false; btn.textContent = '✨ AI 生成分镜大纲'; }
+}
+
+// ── 脚本候选列表 ──
+function renderVideoCandidates(){
+  _videoCandidates = _videoCandidates.length ? _videoCandidates : [];
+  if (!_videoCandidates.length){
+    document.getElementById('videoScriptResult').innerHTML = '';
+    return;
+  }
+  var tabs = _videoCandidates.map(function(c, i){
+    var active = i === _videoSelected;
+    return '<div class="publish-candidate" onclick="selectVideoCandidate('+i+')" style="padding:8px 12px;border:1.5px solid '+
+      (active?'rgba(99,102,241,0.5)':'rgba(148,163,184,0.18)')+';border-radius:6px;cursor:pointer;font-size:12px;background:'+
+      (active?'#EEF2FF':'#fff')+';font-weight:'+(active?'700':'500')+'">候选 '+(i+1)+'：'+esc((c.title||'').slice(0,20))+'</div>';
+  }).join('');
+  document.getElementById('videoScriptResult').innerHTML =
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+tabs+'</div>'+
+    '<div id="videoScriptDetail">'+renderVideoScriptDetail()+'</div>';
+}
+
+function renderVideoScriptDetail(){
+  var script = _videoCandidates[_videoSelected];
+  if (!script) return '';
+  var scenes = (script.scenes || []).map(function(s, i){
+    return '<div class="video-scene" style="background:#fff">'+
+      '<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">'+
+        '<input type="text" value="'+esc(s.time||'')+'" placeholder="0-5s" onchange="updateVideoSceneProp('+i+',\'time\',this.value)" style="width:82px;padding:5px 8px;border:1.5px solid rgba(148,163,184,0.25);border-radius:6px;font-size:12px;color:var(--primary);font-weight:600">'+
+        '<input type="text" value="'+esc(s.visual||'')+'" placeholder="画面描述" onchange="updateVideoSceneProp('+i+',\'visual\',this.value)" style="flex:1;padding:5px 8px;border:1.5px solid rgba(148,163,184,0.25);border-radius:6px;font-size:12px;color:var(--text2)">'+
+        '<button class="btn btn-sm" onclick="refineVideoScene('+i+')" title="只改写这一个分镜">✨</button>'+
+      '</div>'+
+      '<textarea onchange="updateVideoSceneProp('+i+',\'script\',this.value)" placeholder="口播文案" style="width:100%;min-height:52px;padding:7px 10px;border:1.5px solid rgba(148,163,184,0.25);border-radius:6px;font-size:13px;line-height:1.6;resize:vertical">'+esc(s.script||'')+'</textarea>'+
+      '</div>';
+  }).join('');
+  return '<div class="video-script">'+
+    '<input type="text" id="videoScriptTitle" value="'+esc(script.title||'')+'" onchange="updateVideoScriptTitle(this.value)" style="width:100%;padding:8px 10px;border:1.5px solid rgba(148,163,184,0.25);border-radius:6px;font-size:14px;font-weight:700;margin-bottom:8px">'+
+    '<div style="margin-bottom:8px;font-size:12px;color:var(--text2)">标签：'+esc((script.tags||[]).join(' · '))+'</div>'+
+    scenes +
+    '<div style="margin-top:8px;font-size:12px;color:var(--orange)">💡 '+esc(script.suggestion||'')+'</div>'+
+    '<div style="display:flex;gap:8px;margin-top:10px;align-items:center">'+
+      '<input type="text" id="videoRefineInput" placeholder="AI 微调指令，如：开头更抓人、语气更口语化" style="flex:1;padding:8px 10px;border:1.5px solid rgba(148,163,184,0.25);border-radius:6px;font-size:12px">'+
+      '<button class="btn btn-sm" onclick="refineVideoScript()" style="font-size:12px">✨ AI 微调</button>'+
+    '</div></div>';
+}
+
+function selectVideoCandidate(i){
+  _videoSelected = i;
+  renderVideoCandidates();
+  var t = document.getElementById('videoTitle');
+  if (t) t.value = (_videoCandidates[i] || {}).title || '';
+}
+function updateVideoScriptTitle(v){
+  if (_videoCandidates[_videoSelected]) _videoCandidates[_videoSelected].title = v;
+  var t = document.getElementById('videoTitle');
+  if (t) t.value = v;
+}
+function updateVideoSceneProp(i, field, value){
+  var script = _videoCandidates[_videoSelected];
+  if (script && script.scenes && script.scenes[i]) script.scenes[i][field] = value;
+}
+
+async function refineVideoScript(){
+  var script = _videoCandidates[_videoSelected];
+  var input = document.getElementById('videoRefineInput');
+  if (!script || !input) return;
+  var instruction = input.value.trim();
+  if (!instruction) return toast('请输入微调指令','error');
+  try {
+    var res = await apiFetch(PAPI+'/video/refine', {method:'POST', body:JSON.stringify({
+      script: script, instruction: instruction, selection: ''
+    })});
+    _videoCandidates[_videoSelected] = res.script || script;
+    renderVideoCandidates();
+    toast('微调完成','success');
+  } catch(e){ toast('微调失败','error'); }
+}
+async function refineVideoScene(i){
+  var script = _videoCandidates[_videoSelected];
+  var s = (script && script.scenes || [])[i];
+  if (!s) return;
+  var instruction = prompt('只改写第 '+(i+1)+' 个分镜，输入修改指令：', '这段口播更口语化');
+  if (!instruction) return;
+  try {
+    var res = await apiFetch(PAPI+'/video/refine', {method:'POST', body:JSON.stringify({
+      script: script, instruction: instruction,
+      selection: JSON.stringify({time:s.time, visual:s.visual, script:s.script}, null, 0)
+    })});
+    _videoCandidates[_videoSelected] = res.script || script;
+    renderVideoCandidates();
+    toast('该分镜已改写','success');
+  } catch(e){ toast('微调失败','error'); }
+}
+
 async function generateVideoScript(){
   var topic = document.getElementById('videoTopic').value.trim();
   if (!topic) return toast('请输入视频主题','error');
@@ -7456,39 +7634,107 @@ async function generateVideoScript(){
       topic: topic,
       style: document.getElementById('videoStyle').value || '轻松口播',
       duration: parseInt(document.getElementById('videoDuration').value) || 15,
-      platform: document.getElementById('videoPlatform').value || ''
+      platform: document.getElementById('videoPlatform').value || '',
+      outline: serializeVideoOutline()
     })});
-    var script = res.script || {};
-    var scenes = (script.scenes || []).map(function(s){
-      return '<div class="video-scene"><div style="font-size:12px;color:var(--primary);font-weight:600">'+esc(s.time||'')+'</div>'+
-        '<div style="color:var(--text2);font-size:12px">画面：'+esc(s.visual||'')+'</div>'+
-        '<div style="color:var(--text);margin-top:4px">'+esc(s.script||'')+'</div></div>';
-    }).join('');
-    document.getElementById('videoScriptResult').innerHTML =
-      '<div class="video-script"><h4 style="margin:0 0 8px">'+esc(script.title||topic)+'</h4>'+
-      '<div style="margin-bottom:8px;font-size:12px;color:var(--text2)">标签：'+esc((script.tags||[]).join(' · '))+'</div>'+
-      scenes +
-      '<div style="margin-top:8px;font-size:12px;color:var(--orange)">💡 '+(script.suggestion||'')+'</div></div>';
+    _videoCandidates = (res.candidates && res.candidates.length) ? res.candidates : [res.script || {}];
+    _videoSelected = 0;
+    renderVideoCandidates();
     document.getElementById('videoUploadSection').style.display = 'block';
-    document.getElementById('videoTitle').value = script.title || topic;
-    document.getElementById('videoResult').innerHTML = '<div style="color:var(--green);font-size:13px">脚本生成完成，job_id: '+esc(res.job_id||'')+'</div>';
+    document.getElementById('videoTitle').value = (_videoCandidates[0] || {}).title || topic;
+    document.getElementById('videoResult').innerHTML = '<div style="color:var(--green);font-size:13px">脚本生成完成，共 '+_videoCandidates.length+' 个候选，job_id: '+esc(res.job_id||'')+'</div>';
   } catch(e){ toast('脚本生成失败','error'); }
   btn.disabled = false; btn.textContent = '🤖 AI 生成视频脚本';
 }
 
-async function submitVideoPublish(){
+// ── 子任务2：本地视频上传 ──
+async function uploadVideoFile(input){
+  var file = input.files && input.files[0];
+  if (!file) return;
   var accountId = document.getElementById('videoAccountSelect').value;
-  var videoUrl = document.getElementById('videoUrl').value.trim();
-  var title = document.getElementById('videoTitle').value.trim();
-  if (!accountId) return toast('请选择发布账号','error');
+  if (!accountId) { toast('请先选择关联账号','error'); input.value=''; return; }
+  var msg = document.getElementById('videoUploadMsg');
+  var btn = document.getElementById('btnUploadVideo');
+  if (msg) msg.textContent = '上传中：'+file.name+'（'+Math.round(file.size/1024/1024)+'MB）';
+  if (btn) btn.disabled = true;
   try {
-    var res = await apiFetch(PAPI+'/video/upload-platform', {method:'POST', body:JSON.stringify({
-      account_id: parseInt(accountId), video_url: videoUrl || '', title: title,
-      description: (document.getElementById('videoScriptResult').innerText || '').slice(0,500)
-    })});
-    toast('视频发布任务已创建，等待审核','success');
-    loadReviewStats();
-  } catch(e){ toast('提交失败','error'); }
+    var form = new FormData();
+    form.append('file', file);
+    var res = await apiFetch(PAPI+'/accounts/'+accountId+'/video/upload-file', {method:'POST', body:form});
+    _currentVideoUrl = res.url || '';
+    document.getElementById('videoPreviewBox').innerHTML =
+      '<video src="'+esc(_currentVideoUrl)+'" controls preload="metadata" style="width:100%;max-width:420px;border-radius:8px;background:#000"></video>';
+    if (msg) msg.innerHTML = '<span style="color:var(--green)">✅ 上传成功，可用于导出发布包</span>';
+    toast('视频上传成功','success');
+  } catch(e){
+    if (msg) msg.innerHTML = '<span style="color:#ef4444">上传失败：'+esc(e.message||'')+'</span>';
+    toast('视频上传失败','error');
+  }
+  if (btn) btn.disabled = false;
+  input.value = '';
+}
+
+// ── 子任务3：导出发布包 ──
+function _currentVideoScript(){ return _videoCandidates[_videoSelected] || {}; }
+
+function downloadVideoFile(){
+  if (!_currentVideoUrl) return toast('请先上传本地视频','error');
+  var a = document.createElement('a');
+  a.href = _currentVideoUrl;
+  a.download = (_currentVideoScript().title || 'video') + '.' + (_currentVideoUrl.split('.').pop() || 'mp4');
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+function buildVideoPublishText(){
+  var s = _currentVideoScript();
+  var title = (s.title || document.getElementById('videoTitle').value || '').trim();
+  var lines = [];
+  if (title) lines.push(title, '');
+  (s.scenes || []).forEach(function(sc){ if (sc && sc.script) lines.push(sc.script); });
+  if (lines.length) lines.push('');
+  (s.tags || []).forEach(function(t){ if (t) lines.push('#'+String(t).replace(/^#/, '')); });
+  return lines.join('\n');
+}
+
+function buildVideoSceneScriptText(){
+  var s = _currentVideoScript();
+  var lines = ['【'+(s.title||'')+'】'];
+  (s.scenes || []).forEach(function(sc, i){
+    lines.push('');
+    lines.push((i+1)+'. ['+(sc.time||'')+']');
+    lines.push('   画面：'+(sc.visual||''));
+    lines.push('   口播：'+(sc.script||''));
+  });
+  if (s.suggestion) lines.push('', '拍摄建议：'+s.suggestion);
+  return lines.join('\n');
+}
+
+async function copyTextToClipboard(text){
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch(e){
+    // 兜底：clipboard API 在非 HTTPS / 无权限时不可用
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch(_e){ ok = false; }
+    ta.remove();
+    return ok;
+  }
+}
+
+async function copyVideoPublishText(){
+  var text = buildVideoPublishText();
+  if (!text.trim()) return toast('请先生成脚本','error');
+  toast((await copyTextToClipboard(text)) ? '发布文案已复制' : '复制失败，请手动选择文本','success');
+}
+
+async function copyVideoSceneScript(){
+  var text = buildVideoSceneScriptText();
+  if (!(_currentVideoScript().scenes || []).length) return toast('请先生成脚本','error');
+  toast((await copyTextToClipboard(text)) ? '分镜脚本已复制' : '复制失败，请手动选择文本','success');
 }
 
 // ════════════════════════════════════════

@@ -2779,6 +2779,29 @@ class VideoGenerateRequest(BaseModel):
     style: str = "轻松口播"
     duration: int = 15
     platform: str = ""
+    outline: str = ""       # 分镜大纲（每行一个分镜，前端可编辑后回传）
+
+
+class VideoOutlineRequest(BaseModel):
+    """生成分镜大纲（供用户编辑后再生成完整脚本）"""
+    topic: str
+    style: str = "轻松口播"
+    duration: int = 15
+    platform: str = ""
+    scenes: int = 5
+
+
+class VideoRefineRequest(BaseModel):
+    """AI 微调视频脚本"""
+    script: dict
+    instruction: str
+    selection: str = ""     # 非空=仅改写该分镜，其余原样照抄
+
+
+# ── 本地视频上传：类型白名单 / 500MB 上限 / uuid 重命名（复用 P1a 图片上传安全模式） ──
+ALLOWED_VIDEO_EXT = {"mp4", "mov", "avi", "webm", "mkv"}
+MAX_VIDEO_SIZE = 500 * 1024 * 1024
+VIDEO_UPLOAD_DIRNAME = os.path.join("uploads", "video")
 
 
 class VideoUploadRequest(BaseModel):
@@ -2791,6 +2814,23 @@ class VideoUploadRequest(BaseModel):
     scheduled_at: Optional[str] = None
 
 
+@router.post("/video/outline")
+async def video_outline(
+    req: VideoOutlineRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """生成分镜大纲 — 返回 JSON 供前端编辑，编辑后回传 /video/generate 的 outline"""
+    if not (req.topic or "").strip():
+        raise HTTPException(400, "主题为空")
+    try:
+        outline = await AIService.generate_video_outline(
+            req.topic, req.style, req.duration, req.platform, req.scenes
+        )
+    except Exception as e:
+        raise HTTPException(500, f"AI 调用失败: {str(e)}")
+    return {"success": True, "topic": req.topic, "outline": outline}
+
+
 @router.post("/video/generate")
 async def video_generate(
     req: VideoGenerateRequest,
@@ -2798,9 +2838,12 @@ async def video_generate(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """AI 视频脚本生成（占位：真实视频合成可对接外部服务）"""
+    """AI 视频脚本生成 — 返回 3 个候选（占位：真实视频合成可对接外部服务）"""
     job_id = f"vid_{uuid.uuid4().hex[:12]}"
-    script = await AIService.generate_video_script(req.topic, req.style, req.duration, req.platform)
+    candidates = await AIService.generate_video_script_candidates(
+        req.topic, req.style, req.duration, req.platform, req.outline
+    )
+    script = candidates[0] if candidates else {}
 
     VIDEO_JOBS[job_id] = {
         "id": job_id,
@@ -2810,7 +2853,9 @@ async def video_generate(
         "style": req.style,
         "duration": req.duration,
         "platform": req.platform,
+        "outline": req.outline,
         "script": script,
+        "candidates": candidates,
         "video_url": "",  # 真实生成后回填
         "created_at": datetime.utcnow().isoformat(),
         "user_id": current_user.id,
@@ -2819,8 +2864,64 @@ async def video_generate(
     return {
         "job_id": job_id,
         "status": "completed",
-        "script": script,
+        "script": script,          # 兼容旧调用方：首个候选
+        "candidates": candidates,  # 新：候选列表，供前端选择
         "message": "脚本生成完成，视频合成功能需对接外部视频服务",
+    }
+
+
+@router.post("/video/refine")
+async def video_refine(
+    req: VideoRefineRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """AI 微调视频脚本（可选只改写某个分镜）"""
+    if not (req.instruction or "").strip():
+        raise HTTPException(400, "请输入修改指令")
+    if not isinstance(req.script, dict):
+        raise HTTPException(400, "脚本格式不正确")
+    try:
+        refined = await AIService.refine_video_script(req.script, req.instruction, req.selection)
+    except Exception as e:
+        raise HTTPException(500, f"AI 调用失败: {str(e)}")
+    return {"success": True, "script": refined}
+
+
+@router.post("/accounts/{account_id}/video/upload-file")
+async def upload_video_file(
+    account_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """上传本地视频文件（复用 P1a 图片上传的安全模式：类型白名单 + 大小上限 + uuid 重命名）"""
+    acc = _own_or_admin(PlatformAccount, account_id, current_user, db)
+    if not acc:
+        raise HTTPException(404, "账号不存在")
+
+    original_name = file.filename or ""
+    ext = original_name.rsplit(".", 1)[-1].lower() if "." in original_name else ""
+    if ext not in ALLOWED_VIDEO_EXT:
+        raise HTTPException(400, f"仅支持 {'/'.join(sorted(ALLOWED_VIDEO_EXT))} 格式视频")
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "文件内容为空")
+    if len(data) > MAX_VIDEO_SIZE:
+        raise HTTPException(400, "视频不能超过 500MB")
+
+    # uuid 重命名，不保留用户原始文件名（防目录穿越 / 特殊字符）
+    upload_dir = os.path.join(settings.STATIC_DIR, VIDEO_UPLOAD_DIRNAME)
+    os.makedirs(upload_dir, exist_ok=True)
+    saved_name = f"{uuid.uuid4().hex}.{ext}"
+    with open(os.path.join(upload_dir, saved_name), "wb") as f:
+        f.write(data)
+
+    return {
+        "success": True,
+        "url": f"/static/{VIDEO_UPLOAD_DIRNAME}/{saved_name}".replace("\\", "/"),
+        "filename": saved_name,
+        "size": len(data),
     }
 
 
