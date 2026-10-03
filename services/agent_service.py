@@ -29,7 +29,7 @@ from database import (
     PlatformTask, PlatformTaskStatus, TaskType, PlatformAccount, AccountStatus,
     Lead, LeadFollowUp, LeadStatus, OutreachRecord,
 )
-from services.ai_service import AIService
+from services.content_generation_service import generate_content
 from services.follow_up_service import FollowUpService
 from services.risk_control import risk_control, RiskControl
 from utils.logger import get_logger
@@ -397,7 +397,7 @@ async def _stage_generate(
     for opp in opportunities:
         for platform in platforms:
             try:
-                content = await _generate_platform_content(opp["title"], platform, opp["score"])
+                content = await _generate_platform_content(agent, opp["title"], platform, opp["score"])
                 if not content or content.startswith("[MOCK]"):
                     _log_decision(db, run, agent, "generate", "generate_content", "topic", opp["topic_id"],
                                   "skip", "AI 生成失败或未配置", {"platform": platform})
@@ -439,27 +439,30 @@ async def _stage_generate(
     return generated
 
 
-async def _generate_platform_content(title: str, platform: str, score: float) -> str:
-    """调用 AI 为指定平台生成内容"""
-    platform_style = {
-        "zhihu": "知乎回答风格，专业深度，1500字内，开头有钩子",
-        "xiaohongshu": "小红书图文风格，emoji + 分点，标题吸睛，500字内",
-        "weibo": "微博短帖，140字内，话题标签，节奏紧凑",
-        "bilibili": "B站动态风格，轻松口语化，200字内",
-        "douyin": "抖音文案，强情绪开头，钩子明确，100字内",
-    }.get(platform, "通用社媒内容，200字内")
+async def _generate_platform_content(agent: Agent, title: str, platform: str, score: float) -> str:
+    """调用 AI 为指定平台生成内容 — 复用工作台的生成服务（P2 子任务1）
 
-    system = f"""你是社媒内容获客专家。请基于热点话题为 {platform} 平台生成一条内容。
-要求：
-1. 风格：{platform_style}
-2. 蹭热点但不生硬，自然带出产品/服务价值
-3. 结尾留有互动钩子（提问/引导评论）
-4. 不要出现微信号/手机号/外链等敏感信息
-5. 不要使用绝对化用语（最好/第一/唯一等）
-直接输出内容正文，不要解释。"""
-
-    user = f"热点话题：{title}\n热度分：{score:.1f}\n目标平台：{platform}"
-    return await AIService._call_ai(system, user)
+    Agent 场景没有真实的 PlatformAccount，这里用轻量 dict 承载平台/账号名/人设，
+    平台语气与篇幅由 services.content_strategy.PLATFORM_STYLES 统一提供。
+    """
+    pseudo_account = {
+        "platform": platform,
+        "account_name": agent.name or "AI运营智能体",
+        "persona": agent.description or "AI 运营智能体，负责基于热点产出获客内容",
+    }
+    candidates = await generate_content(
+        pseudo_account,
+        title,
+        structured=False,  # Agent 走多平台短内容，不强加 ## 小节等长文排版
+        extra_rules=[
+            "蹭热点但不生硬，自然带出产品/服务价值",
+            "结尾留有互动钩子（提问/引导评论）",
+            "不要出现微信号/手机号/外链等敏感信息",
+            "不要使用绝对化用语（最好/第一/唯一等）",
+        ],
+        user_context=f"\n热度分：{score:.1f}\n目标平台：{platform}",
+    )
+    return candidates[0] if candidates else ""
 
 
 # ════════════════════════════════════════════════════════════════
