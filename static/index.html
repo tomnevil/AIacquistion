@@ -2532,6 +2532,7 @@ a:hover { text-decoration:underline; }
       <div class="publish-action-bar">
         <button class="btn btn-green btn-lg" onclick="doPublishExecute()" style="padding:12px 28px;font-size:14px;font-weight:700;box-shadow:0 4px 16px rgba(16,185,129,0.25)">📤 一键发布</button>
         <button class="btn btn-primary btn-lg" onclick="submitForReview()" style="padding:12px 28px;font-size:14px;font-weight:700">📨 提交审核</button>
+        <button class="btn btn-lg" id="btnSaveToLibrary" onclick="saveToLibrary()" style="padding:12px 20px;font-size:14px;font-weight:700;background:#fff;color:var(--text);border:1.5px solid rgba(148,163,184,0.25)" title="把当前编辑器内容以草稿态存入素材库，供后续复用">💾 存入素材库</button>
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;user-select:none;padding:10px 16px;background:#fff;border:1.5px solid rgba(148,163,184,0.2);border-radius:var(--radius-sm);font-weight:600;transition:all .2s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='rgba(148,163,184,0.2)'">
           <input type="checkbox" id="publishScheduleToggle" onchange="toggleScheduleUI()"> ⏰ 定时发布
         </label>
@@ -4768,6 +4769,33 @@ function selectPublishCandidate(idx){
   }
 }
 
+// ── 工作台 → 素材库：把编辑器内容以草稿态存入 ──
+async function saveToLibrary(){
+  if (!_publishAccountId) return toast('请先选择账号', 'error');
+  var payload = getPublishPayload();
+  var content = payload.content || '';
+  if (!content.trim()) return toast('内容为空，无法存入素材库', 'error');
+
+  var btn = document.getElementById('btnSaveToLibrary');
+  var oldText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '💾 存入中...'; }
+  try {
+    var res = await apiFetch(PAPI+'/accounts/'+_publishAccountId+'/publish/save-to-library', {
+      method: 'POST',
+      body: JSON.stringify({
+        content: content,
+        title: content.trim().split('\n')[0].slice(0, 80),
+        tags: '工作台存入',
+      })
+    });
+    toast('已存入素材库（草稿，模板 #'+res.template_id+'）', 'success');
+  } catch (e) {
+    toast('存入素材库失败: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = oldText || '💾 存入素材库'; }
+  }
+}
+
 async function doPublishExecute(){
   if (!_publishAccountId) return toast('请先选择账号', 'error');
   // 从 Quill 编辑器取 Markdown 正文 + 配图（保留标题/加粗/列表/引用/图片）
@@ -6370,6 +6398,8 @@ updateInboxBadge();  // 页面加载后立即检查一次
 // ════════════════════════════════════════
 
 var _editTopicId = null, selectedTopics = new Set();
+// 选题行缓存：供「✍️ 去创作」按 id 取标题，避免把标题塞进 onclick 里的转义问题
+var _topicRows = {};
 
 async function loadTopics(){
   var pf = (document.getElementById('topicPlatformF')?.value)||'';
@@ -6387,6 +6417,7 @@ async function loadTopics(){
     var STATUS_BADGES = {draft:'badge-low', selected:'badge-blue', published:'badge-green', archived:'badge-red'};
     var STATUS_NAMES = {draft:'草稿', selected:'已选中', published:'已发布', archived:'已归档'};
     tb.innerHTML = res.data.map(function(t){
+      _topicRows[t.id] = t;
       var aiBadge = t.is_ai_generated ? ' <span style="background:#DBEAFE;color:#1E40AF;font-size:10px;padding:1px 5px;border-radius:4px">AI</span>' : '';
       return '<tr>'+
         '<td><input type="checkbox" value="'+t.id+'" '+(selectedTopics.has(t.id)?'checked':'')+' onchange="toggleTopicSel('+t.id+')"></td>'+
@@ -6397,6 +6428,7 @@ async function loadTopics(){
         '<td><span class="badge '+(STATUS_BADGES[t.status]||'badge-low')+'">'+(STATUS_NAMES[t.status]||t.status)+'</span></td>'+
         '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(t.description||'')+'">'+esc(t.description||'-')+'</td>'+
         '<td class="actions-cell">'+
+          '<button class="btn btn-sm btn-outline" onclick="createFromTopic('+t.id+')" title="把该选题标题载入工作台主题框">✍️ 去创作</button>'+
           '<button class="btn btn-sm btn-outline" onclick="editTopic('+t.id+',\''+esc(t.title).replace(/'/g,"\\'")+'\',\''+esc(t.platform)+'\',\''+esc(t.category)+'\','+(t.priority||0)+',\''+esc(t.tags||'').replace(/'/g,"\\'")+'\',\''+esc(t.description||'').replace(/'/g,"\\'")+'\')">编辑</button>'+
           (t.status==='draft'?'<button class="btn btn-sm btn-green" onclick="updateTopicStatus('+t.id+',\'selected\')">选中</button>':'')+
           (t.status==='selected'?'<button class="btn btn-sm btn-green" onclick="updateTopicStatus('+t.id+',\'published\')">发布</button>':'')+
@@ -6404,6 +6436,20 @@ async function loadTopics(){
         '</td></tr>';
     }).join('');
   }
+}
+
+// ── 选题库 → 工作台：把选题标题灌进主题框并跳转 ──
+function createFromTopic(id){
+  var t = _topicRows[id];
+  var title = (t && t.title || '').trim();
+  if(!title){ toast('该选题没有标题，无法载入', 'error'); return; }
+  var input = document.getElementById('publishTopic');
+  if(input){ input.value = title; }
+  // 先切 tab（切换时内部会重置为步骤1），再推进到步骤2
+  switchTabSidebar('publish');
+  if(input){ input.focus(); }
+  updateWorkflowStep(2);
+  toast('已载入主题，可生成大纲或直接生成内容', 'success');
 }
 
 function toggleTopicSelectAll(){
@@ -8340,11 +8386,33 @@ async function loadMyTemplates() {
         + '<button class="btn-link" onclick="showVersionsModal('+t.id+')">📜版本</button> '
         + '<button class="btn-link" onclick="showCreateVariantModal('+t.id+')">🧪变体</button> '
         + '<button class="btn-link" onclick="showApplyModal('+t.id+')">📤套用</button> '
+        + '<button class="btn-link" onclick="loadTemplateToWorkbench('+t.id+')" title="把模板正文灌入工作台编辑器，可改后再发">✏️载入工作台</button> '
         + '<button class="btn-link" onclick="publishToMarket('+t.id+')">🏪发布</button> '
         + '<button class="btn-link" style="color:#ef4444" onclick="archiveTemplate('+t.id+')">归档</button>'
         + '</td></tr>';
     }).join('') || '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text2)">暂无模板，点击右上角「+ 新建模板」</td></tr>';
   } catch (e) { console.error('loadMyTemplates', e); }
+}
+
+// ── 素材库 → 工作台：把模板正文灌入编辑器（与 selectPublishCandidate 同一灌入路径）──
+async function loadTemplateToWorkbench(templateId){
+  try {
+    var r = await apiFetch(CA_API + '/templates/' + templateId + '/load-content');
+    var d = r.data || {};
+    var txt = d.template || '';
+    if (!txt.trim()) { toast('该模板内容为空', 'error'); return; }
+
+    var fill = function(){
+      _publishEditor.root.innerHTML = mdToQuillHtml(txt);
+      updatePublishCharCount();
+    };
+    // 先切 tab，再灌内容——避免编辑器在隐藏容器里初始化异常
+    switchTabSidebar('publish');
+    if (_publishEditor) { fill(); } else { initPublishEditor(fill); }
+    toast('已载入工作台，可编辑后再发布', 'success');
+  } catch (e) {
+    toast('载入工作台失败: ' + e.message, 'error');
+  }
 }
 
 async function loadAbTestSelect() {

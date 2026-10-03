@@ -353,6 +353,27 @@ def list_applicable_accounts(
                       "status": a.status} for a in rows]}
 
 
+@router.get("/templates/{template_id}/load-content")
+def load_template_content(
+    template_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """素材库 → 工作台：取回模板正文，供前端灌入工作台编辑器"""
+    t = _own_or_admin(ContentLibrary, template_id, current_user, db)
+    if not t:
+        raise HTTPException(404, "模板不存在或无权限")
+    return {
+        "data": {
+            "id": t.id,
+            "template": t.template,
+            "platform": t.platform,
+            "category": t.category or "",
+            "title": (t.template or "").strip().split("\n")[0][:100],
+        }
+    }
+
+
 @router.post("/templates/{template_id}/apply")
 def apply_to_accounts(
     template_id: int,

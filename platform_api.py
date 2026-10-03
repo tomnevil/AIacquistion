@@ -21,6 +21,9 @@ from database import (
 from services import platform_manager, content_strategy, risk_control
 from services.ai_service import AIService
 from services.content_strategy import PLATFORM_STYLES
+# 注意：本模块 443 行已有同名 endpoint 函数 generate_content，故此处用别名导入避免遮蔽
+from services.content_generation_service import generate_content as generate_publish_candidates
+from services import content_asset_service as cas
 from services.auth_service import get_current_user, has_permission, require_permission
 from config import settings
 from utils.permission import _is_admin, _get_team_user_ids, _filter_by_user, _own_or_admin
@@ -704,86 +707,31 @@ async def generate_publish_content(
     if not acc:
         raise HTTPException(404, "账号不存在")
 
-    style = PLATFORM_STYLES.get(acc.platform, PLATFORM_STYLES.get("weibo", {}))
-    persona_text = acc.persona or "普通用户"
-
-    system = f"""你是一个专业的内容创作者，正在为一个社交媒体账号生成发布内容。
-
-账号信息:
-- 平台: {acc.platform}
-- 账号名: {acc.account_name}
-- 人设: {persona_text}
-- 平台风格:
-  · 语气: {style.get('tone', '真诚分享')}
-  · 建议篇幅: {style.get('max_len', 500)}字左右
-  · 结构: {style.get('structure', '自由发挥')}
-
-核心要求:
-1. 内容符合人设，像是这个人自己写的
-2. 适配目标平台调性和格式
-3. 真实自然，不像是广告或AI生成
-4. 内容要充实有深度，有足够的信息量和细节支撑，不要简短敷衍
-5. 有信息增量，能引发互动
-6. 如果是帖子类，适合带话题标签
-{('额外风格提示: ' + req.style_hint) if req.style_hint else ''}
-"""
-
-    # 用户附加要求（篇幅/受众/关键词/策略/CTA/大纲/自定义提示词/结构化排版）
-    extra = []
-    if req.length:
-        extra.append(f"篇幅: {req.length}")
-    if req.audience:
-        extra.append(f"目标受众: {req.audience}")
-    if req.keywords:
-        extra.append(f"必须覆盖关键词: {req.keywords}")
-    if req.strategy:
-        extra.append(f"切入角度/策略: {req.strategy}")
-    if req.cta:
-        extra.append(f"结尾互动引导: {req.cta}")
-    if req.outline:
-        extra.append("严格按以下大纲结构写作（每行一节，按顺序展开）:\n" + req.outline)
-    if req.custom_prompt:
-        extra.append("用户自定义要求: " + req.custom_prompt)
-    if req.structured:
-        extra.append(
-            "排版要求：使用结构化排版——开头单独一行给一个吸引人的标题；小节用 '## 小节标题'；"
-            "重点用 **加粗**；要点用 '- ' 列表；金句/总结用 '> ' 引用。"
-        )
-    if extra:
-        system += "\n用户附加要求:\n- " + "\n- ".join(extra)
-
-    system += ('\n\n请生成3个候选版本。每个候选必须是独立完整的文章；候选之间用单独一行的'
-               '标记 <<<CANDIDATE_SPLIT>>> 分隔（除此之外正文里不要出现该标记）。内容充实。'
-               '直接输出最终内容，不要输出任何思考过程或解释。')
-
-    topic_str = f"主题方向: {req.topic}" if req.topic else "主题不限，自由发挥"
-    user = f"""{topic_str}
-
-请为该账号生成3个候选发布内容:"""
-
+    # P2 子任务1：生成逻辑已抽到 services/content_generation_service，工作台与 Agent 共用
     try:
-        result = await AIService._call_ai(system, user)
+        items = await generate_publish_candidates(
+            acc,
+            req.topic,
+            style_hint=req.style_hint or "",
+            length=req.length or "",
+            audience=req.audience or "",
+            keywords=req.keywords or "",
+            strategy=req.strategy or "",
+            cta=req.cta or "",
+            outline=req.outline or "",
+            custom_prompt=req.custom_prompt or "",
+            structured=req.structured,
+        )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, f"AI 调用失败: {str(e)}")
-
-    items = [seg.strip() for seg in result.split("<<<CANDIDATE_SPLIT>>>") if seg.strip()]
-    # 过滤掉模型泄漏的英文思考过程（不含足量中文的片段）
-    import re as _re_split
-
-    def _is_reasoning(seg: str) -> bool:
-        head = seg[:300]
-        cn = len(_re_split.findall(r"[\u4e00-\u9fff]", head))
-        return bool(_re_split.match(r"^\s*(The user|Let me|I need|I should|Okay|Sure|First)", head)) and cn < 40
-
-    items = [s for s in items if not _is_reasoning(s)]
-    if not items:
-        items = [result.strip()]
 
     return {
         "account_id": account_id,
         "platform": acc.platform,
         "account_name": acc.account_name,
-        "persona": persona_text,
+        "persona": acc.persona or "普通用户",
         "candidates": items,
     }
 
@@ -1043,6 +991,57 @@ async def submit_publish_for_review(
         return {"task_id": task.id, "success": True, "scheduled": True, "status": task.status, "scheduled_at": req.scheduled_at}
 
     return {"task_id": task.id, "success": True, "scheduled": False, "status": task.status, "review_level": task.review_level}
+
+
+# ════════════════════════════════════════════════════════════
+#  工作台 → 素材库（P2 子任务2）
+# ════════════════════════════════════════════════════════════
+
+class SaveToLibraryRequest(BaseModel):
+    """把工作台当前内容存入素材库（草稿态）"""
+    content: str
+    title: str = ""
+    platform: str = ""
+    category: str = ""
+    tags: str = ""
+
+
+@router.post("/accounts/{account_id}/publish/save-to-library")
+def save_publish_to_library(
+    account_id: int,
+    req: SaveToLibraryRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """工作台内容存入素材库 — 以 draft 态入库，供后续复用/载入工作台编辑"""
+    acc = _own_or_admin(PlatformAccount, account_id, current_user, db)
+    if not acc:
+        raise HTTPException(404, "账号不存在")
+    content = (req.content or "").strip()
+    if not content:
+        raise HTTPException(400, "内容为空，无法存入素材库")
+
+    try:
+        t = cas.create_template(
+            user_id=current_user.id,
+            platform=req.platform or acc.platform,
+            template=content,
+            category=req.category or settings.DEFAULT_TEMPLATE_CATEGORY,
+            tags=req.tags or "",
+            is_ai_generated=True,
+            status="draft",
+            changed_by=current_user.id,
+            db=db,
+        )
+    except Exception as e:
+        raise HTTPException(500, f"存入素材库失败: {str(e)}")
+
+    return {
+        "success": True,
+        "template_id": t.id,
+        "status": t.status,
+        "message": "已存入素材库（草稿）",
+    }
 
 
 # ════════════════════════════════════════════════════════════
